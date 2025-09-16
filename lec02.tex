@@ -1,0 +1,199 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\newcommand{\impliesR}{\implies_{R}}
+\newcommand{\impliesE}{\implies_{E}}
+\newcommand{\caseof}[5]{\mathbf{case}~(#1)~\mathbf{of}~(#2 \Rightarrow #3 \mid #4 \Rightarrow #5)}
+
+\title{Lecture 2: Harmony}
+\author{Luis Garcia}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Lecture outline:
+\begin{itemize}
+    \item Harmony
+    \item Normalization for the STLC
+    \item Global Soundness and Completeness
+    \item Sequent Calculus
+\end{itemize}
+
+We want to show that our logic ``makes sense". In other words, we want soundness. Last lecture, we posited that a definition of soundness can be showing that it is impossible to prove false. However, that's a bit of a narrow view. What we want to show is that our elimination rules aren't ``too strong"---that is, that they don't produce new information we don't already have. Dual to this is showing that our elimination rules aren't ``too weak". We will explore what this means with the concept of \textit{harmony}, realized by the notions of \textit{local soundness} and \textit{local completeness}.
+
+\section{Local Soundness and Completeness}
+Local soundness and completeness are heuristics for logic design\footnote{Side note: it does not work for \textit{every} logic. However, it's still a good exercise to do when designing a logic.}. Local soundness can be witnessed by a \textit{local reduction}, which is achieved by constructing evidence for a conclusion from evidence for its premises. Here's an example with conjunction:
+
+\[
+    \begin{array}{ccc}
+         \infer[\iand E_1]
+        {\Gamma \vdash A \istrue}
+        {
+            \infer[\iand I]
+            {\Gamma \vdash A \iand B \istrue}
+            {
+                \deduce{\Gamma \vdash A \istrue}{\mathcal{D}}
+                &
+                \deduce{\Gamma \vdash B \istrue}{\mathcal{E}}
+            }
+        }
+        & 
+        \impliesR
+        &
+        \deduce{\Gamma \vdash A \istrue}{\mathcal{D}}
+         
+    \end{array}
+\]
+
+Local completeness is witnessed by a \textit{local expansion}, which is achieved by applying the elimination rules to a judgment to recover the original judgment. Again, with conjunction:
+
+\[
+\begin{array}{ccc}
+     \deduce{\Gamma \vdash A \iand B \istrue}{\mathcal{D}} &
+     \impliesE &
+     \infer[\iand I]
+     {
+        \Gamma \vdash A \iand B \istrue
+     }
+     {
+        \infer[\iand E_1]{
+            \Gamma \vdash A \istrue
+        }{
+            \deduce{\Gamma \vdash A \iand B \istrue}{\mathcal{D}}
+        }
+        \infer[\iand E_2]{
+            \Gamma \vdash B \istrue
+        }{
+            \deduce{\Gamma \vdash A \iand B \istrue}{\mathcal{D}}
+        }
+     }
+\end{array}
+\]
+
+We can complete the same exercise for other connectives to show that they are harmonious. Disjunction is a bit more complicated than conjunction. It also gives us a chance to see what happens when local soundness or completeness fails. Consider a ``bad" rule for elimination rule for disjunction:
+
+\[
+    \infer[\ior E?]{
+        \Gamma \vdash A \istrue
+    }{
+        \Gamma \vdash A \ior B \istrue
+    }
+\]
+
+Checking for local soundness, we can see that we cannot locally reduce an elimination followed by an introduction:
+
+\[
+    \infer[\ior E?]{
+        \Gamma \vdash A \istrue
+    }{
+        \infer[\ior I_2]{
+            \Gamma \vdash A \ior B \istrue
+        }{
+            \deduce{\Gamma \vdash B \istrue}{\mathcal{D}}
+        }
+    }
+\]
+
+Our elimination rule is too strong: it allows us to conclude $A \istrue$ even though we have no evidence to prove it. To see the contrast with the correct rule, we need to employ the \textit{substitution principle}.
+
+\section{Substitution}
+
+\begin{definition}[Substitution Principle]
+    If $\Gamma, A \istrue \vdash C \istrue$ and $\Gamma \vdash A \istrue$, then $\Gamma \vdash C \istrue$.
+\end{definition}
+
+This is a fundamental principle of natural deduction that corresponds to variable substitutions in a lambda calculus. Let's see how. The local reduction of disjunction is written below. There are actually two local reductions we could do. The case where we use $\ior I_2$ is symmetric to the one we show here. We write $subst(\mathcal{E}, \mathcal{D})$ to show that we are applying the substitution principle on the derivations.
+
+\[
+\begin{array}{ccc}
+     \infer[\ior E]{
+        \Gamma \vdash C \istrue
+     } {
+        \infer[\ior I_1]{
+            \Gamma \vdash A \ior B \istrue
+        }{
+            \deduce{\Gamma \vdash A \istrue}{\mathcal{D}}
+        }
+        &
+        \deduce{\Gamma, A\istrue \vdash C\istrue}{\mathcal{E}}
+        &
+        \deduce{\Gamma, B\istrue \vdash C\istrue}{\mathcal{F}}
+     }
+     & 
+     \impliesR
+     &  
+     \deduce{\Gamma \vdash C\istrue}{subst(\mathcal{E}, \mathcal{D})}
+\end{array}
+\]
+
+For completeness, here's local expansion:
+
+\[
+    \begin{array}{ccc}
+        \deduce{\Gamma \vdash A \ior B \istrue}{\mathcal{D}}
+        &  
+        \impliesE
+        &
+        \infer[\ior E]{
+            \Gamma \vdash A \ior B \istrue
+        }{
+            \deduce{\Gamma \vdash A \ior B \istrue}{\mathcal{D}}
+            &
+            \infer[\ior I_1]{
+                \Gamma, A \vdash A \ior B \istrue
+            }{
+                \infer[hyp]{
+                    \Gamma, A\istrue \vdash A\istrue
+                }{}
+            }
+            &
+            \infer[\ior I_2]{
+                \Gamma, B \vdash A \ior B \istrue
+            }{
+                \infer[hyp]{
+                    \Gamma, B\istrue \vdash B\istrue
+                }{}
+            }
+        }
+    \end{array}
+\]
+
+Now, how does the substitution principle here relate to substitution in programming? Recall that we can condense a proof tree into a proof term in the lambda calculus. For the above tree for the local soundness demonstration, we can write the term:
+\[
+    \caseof{inl~M}{x}{N}{y}{P}
+\]
+where $M : A\ior B$, $x : A$, and $y : B$. Then, the local reduction tells us that we have the following
+\[
+    [M / x]N.
+\]
+From the world of programming languages, this is a simple $\beta$-reduction rule!
+\[
+    \caseof{inl~M}{x}{N}{y}{P} \mapsto_\beta [M / x]N
+\]
+
+Similarly, local expansion corresponds to $\eta$-expansion rules:
+\[
+    M \mapsto_\eta \langle inl~M, inr~M\rangle
+\]
+provided that $M : A \ior B$.
+
+\begin{exercise}
+    Show that the rules for implication are locally sound and complete, and show how they relate to $\beta$-reduction and $\eta$-expansion.
+\end{exercise}
+
+\section{Normalization}
+By thinking about soundness, we are also working toward a sense for what \textit{normalization} means. The vibe is ``there are no detours or circularities in our proofs". By detours, we mean exactly the kinds of things we are doing to show local soundness and completeness: pointless invocations of rules that yield no new information from our hypotheses. 
+
+
+\end{document}
