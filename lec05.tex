@@ -1,0 +1,166 @@
+\documentclass{article}
+\usepackage{geometry}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage{subcaption}
+\usepackage[utf8]{inputenc}
+\usepackage{changepage}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+\usepackage[table, dvipsnames]{xcolor}
+\newcommand{\fc}{RoyalBlue}
+
+\title{Lecture 5: Verifications and Uses Cont; Normalization}
+\author{Elan}
+\date{9/22}
+
+\begin{document}
+
+\maketitle
+
+\section{Verifications and Uses (Cont)}
+
+Last time, we introduced the calculus of verifications and uses (VU). As discussed earlier in the semester, a good sanity check that the calculus is reasonable is to ensure local soundness and completeness. However, due to the very structure of VU, we cannot introduce and immediately eliminate a connective, nor the other way around. 
+
+We do, however, have a sense of completeness that we can write down specifically for VU:
+
+\begin{theorem}[VU ``Local Completeness"]
+    If $\Gamma \vdash A \use$, then $\Gamma \vdash A \verif$.
+\end{theorem}
+
+\begin{proof}
+By induction on $A$. We did the implication case in class.
+
+\textit{Case $\imp$}. Suppose we have a derivation $\DD$ of $\Gamma \vdash A \imp B \use$. By the inductive hypothesis (which is induction on $A$, \textit{not} the derivation), we know that if we have a derivation of $\Gamma' \vdash A \use$, then $\Gamma' \vdash A \verif$, and similarly for $B$ (note that the context does not have to stay the same for this inductive hypothesis). We want $\Gamma \vdash A \imp B \verif$
+
+Now, let's slowly build up the derivation for $\Gamma \vdash A \imp B \verif$!
+
+\[
+\infer[\imp I]
+  {\Gamma \vdash A \imp B \verif}
+  {\infer[\imp E]
+    {\Gamma, A \use \vdash B \verif}
+    {\Gamma, A \use \vdash A \imp B \use 
+    & \Gamma, A \use \vdash A \verif}
+    }
+\]
+
+We've already assumed that we have $\DD$. We can weaken it with $A \use$, and we now have a derivation for the first leaf. Now for the second, we can use our induction hypothesis on $A$: if we have a derivation of $\Gamma, A \use \vdash A \use$, then we have a derivation of $\Gamma, A \use \vdash A \verif$. And wouldn't you have it: we have that first derivation by just applying hypothesis. Therefore we also have some derivation for $\Gamma, A \use \vdash A \verif$, completing this case of the proof.
+
+% TODO Chris, is the way I wrote out that last paragraph correct?
+\end{proof}
+
+\begin{exercise}
+    Do some other cases of this proof.
+\end{exercise}
+\begin{exercise}
+    In class, we did this the $\imp$ case using proof terms. For the cases you proved, write out the proof terms. Try proving a case using only proof terms.
+\end{exercise}
+\begin{exercise}
+    In your own words, how does this proving theorem act as a similar sanity check to proving local soundness and completeness for other logics?
+\end{exercise}
+
+\subsection{Discussion of Atomic $\use \verif$ Rule}
+If you were present in person during lecture four, you may remember that when we first introduced the $\use \verif$ rule, we let it act over any proposition. In this lecture, we reintroduced the rule, but acting \textit{only} on atomic propositions. We then proved the above theorem, letting us know that the old rule we had is admissable in our system.
+
+Why did we restrict the rule in our re-presentation? One reason is for the sake of ``uniqueness" of proofs.
+
+Take, for example, $\cdot \vdash (A \wedge B) \imp (A \wedge B) \verif$, where $A,B$ are atomic. Under our old rule, there would be two rules we could use to prove this:
+\[
+\infer[\imp I]
+    {\cdot \vdash (A \wedge B) \imp (A \wedge B) \verif}
+    {\infer[\use \verif]
+        {A \wedge B \use \vdash A \wedge B \verif}
+        {\infer[hyp]{A \wedge B \use \vdash A \wedge B \use}{}}}
+\qquad
+\infer[\imp I]
+    {\cdot \vdash (A \wedge B) \imp (A \wedge B) \verif}
+    {\infer[\wedge I]
+        {A \wedge B \use \vdash A \wedge B \verif}
+        {\infer[\use \verif]
+            {A \wedge B \use \vdash A \verif }
+            {\infer[\wedge E_1]
+                {A \wedge B \use \vdash A \use}
+                {\infer[hyp]{A \wedge B \use \vdash A \wedge B \use}{}}
+            }
+        &  
+        \infer[\use \verif]
+            {A \wedge B \use \vdash B \verif }
+            {\infer[\wedge E_2]
+                {A \wedge B \use \vdash B \use}
+                {\infer[hyp]{A \wedge B \use \vdash A \wedge B \use}{}}
+            }}
+    }
+\]
+
+However, with the atomic rule, only the second would be valid. In fact, under the atomic rule, this proposition has \textit{exactly} one proof, and it is the one on the right. We like this, as a good chunk of this class is about cutting down nondeterminism in proofs.
+
+\section{SC $\implies$ VU}
+As a reminder, we would like to prove that natural deduction (ND) and sequent calculus (SC) are equivalent in a way. The way we're approaching this is to prove a theorem that if a sequent/judgment has a derivation in SC/ND, then the translated statement will have a derivation in the other system. We've already proven that ND $\implies$ SC (mostly lecture four). However, proving SC $\implies$ ND is a little tricky. Therefore, we've constructed this middle system, VU, that allows us to first prove SC $\implies$ VU, and the trivially prove VU $\implies$ SC.
+
+Let's do this proof!
+
+\begin{theorem}
+    If we have a derivation $\DD$ of $\Gamma \implies A$, then we can construct a derivation of $(\Gamma)\use \vdash A \verif$.
+\end{theorem}
+\begin{proof}
+    Proceed by induction on $\DD$. This means we'll be going through the rules of SC, and anytime we have a subsequent, we can apply the inductive hypothesis on them.
+
+    In class, we did three cases: id, $\imp L$, and $\wedge R$. I will typeset the most interesting one: $\imp L$.
+
+    Suppose we have a derivation $\DD$ of $\Gamma, A \imp B \implies C$. This means we have the following:
+    \[
+    \infer[\imp L]
+        {\Gamma, A \imp B \implies C}
+        {\deduce{\Gamma, A \imp B \implies A}{\DD_1}
+        &
+        \deduce{\Gamma, A \imp B, B \implies C}{\DD_2}
+        }
+    \]
+    We want to show that $\Gamma \use, A \imp B \use \vdash C \verif$
+
+    We can apply the inductive hypotheses on the subderivations:
+    \begin{itemize}
+        \item $IH(\DD_1):~\Gamma \use, A \imp B \use \vdash A \verif$
+        \item $IH(\DD_2):~\Gamma \use, A \imp B \use, B \use \vdash C \verif$
+    \end{itemize}
+    The intuition here is that we want to create a derivation for $B \use$, and then ``staple it into" $IH(\DD_2)$ (aka, substitute it in). If we do so, then we'll have exactly the goal we want.
+
+    Luckily, we can construct one pretty readily from $IH(\DD_1)$!
+    \[
+    \infer[\imp E]
+        {\Gamma \use, A \imp B \use \vdash B \use}
+        {\infer[hyp]{\Gamma \use, A \imp B \use \vdash A \imp B \use}{}
+        &
+        \deduce{\Gamma \use, A \imp B \use \vdash A \verif}{IH(\DD_1)}
+        }
+    \]
+    If we call this derivation $\EE$, then $subst(\EE, IH(\DD_2))$ gives us what we want. Case done.
+\end{proof}
+\begin{exercise}
+    Do some other cases of this proof.
+\end{exercise}
+\begin{exercise}
+    A worried student might look at this and be worried that something is a little fishy. Specifically, they might say something like this: 
+    \begin{adjustwidth}{1.5cm}{1.5cm}
+    ``This proof seems like it's constructing an algorithm to take a SC derivation to an UV one. But aren't there more SC derivations of a single sequent than there are UV ones? I don't see where two different SC derivations might get mapped to the same UV derivation."
+    \end{adjustwidth}
+    Convince them that all is well.
+\end{exercise}
+
+\subsection{Reflection}
+So, what did we just do? We have showed that all of these calculi are equivalent, but we've \textit{also} constructed algorithms that take derivations in one calculi to another. Specifically, we have these functions:
+\begin{itemize}
+    \item ND-to-SC. Note that this really also has a hidden second step: cut-elimination using the cut-admissability proof. So, really, we have $cut-elim \circ ND-to-SC$.
+    \item SC-to-VU, as above.
+    \item VU-to-ND, which is really just "erasing" all of the $\verif$ and $\use$.
+\end{itemize}
+If we compose them,
+$$erase ~\circ~ SC-to-VU ~\circ~ cut-elim ~\circ~ ND-to-SC$$
+we have a \textit{round trip} function that takes derivations in ND and (kinda) normal form-s them, while keeping the result $\beta \eta$-equivalent to the input. Now, technically, in exactly the way we wrote it, this is false due to our disjunction being written down simply, and ``distinguishing too many things." This is related to something called ``commuting conversion" being the type of equality we want on disjunction, but that doesn't fall out of the rules we wrote out. This is something that we'll likely come back to later. However, the idea surrounding the importance of this round-trip functions stays the same.
+
+\end{document}
