@@ -1,0 +1,307 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+% Borrowed from Joseph's lec06.
+\newcommand*{\bnfor}{\mid}
+\newcommand*{\focsep}{\,\vert\,}
+\newcommand*{\foc}[1]{\mathcolor{red}{#1}}
+\newcommand*{\nat}{\operatorname{\textsf{nat}}}
+\newcommand*{\s}{\operatorname{\textsf{suc}}}
+\newcommand*{\z}{\operatorname{\textsf{zero}}}
+
+\title{Lecture 7: Logic Programming}
+\author{Mingtong Lin}
+\date{September 29, 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Lecture outline:
+\begin{itemize}
+\item Quantifiers
+\item Logic programming
+\end{itemize}
+
+\section{Quantifiers}
+
+\subsection{Grammar}
+
+In this lecture, we continue with the polarized sequent calculus from last time,
+but extended it with quantifiers.  The grammar and the blurring rules are the same
+from last time, but the focusing rules are presented slightly differently.
+
+\begin{alignat*}{2}
+  &A, B ::= A^{+} \bnfor A^{-} &&\text{formulas} \\
+  &A^{+}, B^{+} ::= \exists x : \tau. \, A &&\text{positive connectives} \\
+  &A^{-}, B^{-} ::= A \imp B \bnfor \forall x : \tau. \, A \bnfor p \quad &&\text{negative connectives}
+\end{alignat*}
+
+\[
+  \infer[\textsf{focus}^{u}_{L}]
+  {\Gamma \proves C}
+  {u : A^{-} \in \Gamma
+    &
+  \Gamma \focsep \foc{[A^{-}]} \proves C}
+  \qquad
+  \infer[\textsf{focus}_{R}]
+  {\Gamma \proves A^{+}}
+  {\Gamma \proves \foc{[A^{+}]}}
+\]
+\[
+  \infer[\textsf{blur}_{L}]
+  {\Gamma \focsep \foc{[A^{+}]} \proves C}
+  {\Gamma, A^{+} \proves C}
+  \qquad
+  \infer[\textsf{blur}_{R}]
+  {\Gamma \proves \foc{[A^{-}]}}
+  {\Gamma \proves A^{-}}
+\]
+\[
+  \infer[\textsf{init}^{-}]
+  {\Gamma \focsep \foc{[p^{-}]} \proves p^{-}}
+  {}
+\]
+
+\subsection{Logical Rules}
+
+We first present the quantifier rules with some redundancies.
+\[
+  \infer[\forall R]
+  {\Gamma \proves \forall x : \tau. \, A}
+  {\Gamma, y : \tau \proves A [y/x]}
+  \qquad
+  \infer[\forall L]
+  {\Gamma \focsep \foc{[\forall x : \tau. \, A]} \proves C}
+  {\Gamma \proves t : \tau
+    &
+    \Gamma, \forall x : \tau. \, A \focsep \foc{[A[t/x]]} \proves C}
+\]
+\[
+  \infer[\exists R]
+  {\Gamma \proves \foc{[\exists x : \tau. \, A]}}
+  {\Gamma \proves t : \tau
+    &
+    \Gamma \proves \foc{[A[t/x]]}}
+  \qquad
+  \infer[\exists L]
+  {\Gamma, \exists x : \tau. \, A \proves C}
+  {\Gamma, \exists x : \tau. \, A, t : \tau, u : A [t/x] \proves C}
+\]
+\[
+  \infer[\imp R]
+  {\Gamma \proves A \imp B}
+  {\Gamma, u : A \proves B}
+  \qquad
+  \infer[\imp L]
+  {\Gamma \focsep \foc{[A \imp B]} \proves C}
+  {\Gamma, A \imp B \proves \foc{[A]}
+    &
+    \Gamma, A \imp B \focsep \foc{[B]} \proves C}
+\]
+
+The optimized rules are:
+\[
+  \infer[\forall R]
+  {\Gamma \proves \forall x : \tau. \, A}
+  {\Gamma, x : \tau \proves A}
+  \qquad
+  \infer[\forall L]
+  {\Gamma \focsep \foc{[\forall x : \tau. \, A]} \proves C}
+  {\Gamma \proves t : \tau
+    &
+    \Gamma \focsep \foc{[A[t/x]]} \proves C}
+\]
+\[
+  \infer[\exists R]
+  {\Gamma \proves \foc{[\exists x : \tau. \, A]}}
+  {\Gamma \proves t : \tau
+    &
+    \Gamma \proves \foc{[A[t/x]]}}
+  \qquad
+  \infer[\exists L]
+  {\Gamma, \exists x : \tau. \, A \proves C}
+  {\Gamma, \exists x : \tau. \, A, t : \tau, u : A [t/x] \proves C}
+\]
+\[
+  \infer[\imp R]
+  {\Gamma \proves A \imp B}
+  {\Gamma, u : A \proves B}
+  \qquad
+  \infer[\imp L]
+  {\Gamma \focsep \foc{[A \imp B]} \proves C}
+  {\Gamma \proves \foc{[A]}
+    &
+    \Gamma \focsep \foc{[B]} \proves C}
+\]
+
+\section{Logic Programming}
+
+For the rest of the lecture, we remove \(\exists R\) and \(\exists L\).  Since existential
+quantifier is the only positive connective in our grammar, we have essentially removed the
+entire syntax category \(A^{+}\).  Also, since we no longer have any positive rules, we may remove
+\(\textsf{blur}_{L}\) and \(\textsf{focus}_{R}\) as well.  Then, we are left with the negative
+fragment of the logic.
+
+For the following example:
+\[
+  \cdot \proves p \imp (p \imp q) \imp (q \imp r) \imp (p \imp r) \imp r
+\]
+First, we apply the trivial \(\imp R\) rules:
+\[
+  \infer[\imp R]
+  {\cdot \proves p \imp (p \imp q) \imp (q \imp r) \imp (p \imp r) \imp r}
+  {\infer[\imp R]
+    {u_{1} : p \proves (p \imp q) \imp (q \imp r) \imp (p \imp r) \imp r}
+    {\infer[\imp R]
+      {u_{1} : p, u_{2} : p \imp q \proves (q \imp r) \imp (p \imp r) \imp r}
+      {\infer[\imp R]
+        {u_{1} : p, u_{2} : p \imp q, u_{3} : q \imp r \proves (p \imp r) \imp r}
+        {\infer[\imp R]
+        {\Gamma = u_{1} : p, u_{2} : p \imp q, u_{3} : q \imp r, u_{4} : p \imp r \proves r}
+        {?}}}}}
+\]
+Let's pause and rewrite the sequent as \(\Gamma \proves C\).  Now, think about what are
+the possible rules to apply.  Clearly, the only rule that gets us foward is
+\(\textsf{focus}^{u}_{L}\), but which \(u\) should we choose?
+
+Let's first try \(u_{1} : p\), then we end up with the derivation:
+\[
+  \infer[\textsf{focus}^{u_{1}}_{L}]
+  {\Gamma \proves C}
+  {\infer[?]
+    {\Gamma \focsep \foc{[p]} \proves C}
+    {}}
+\]
+The only choice for \(?\) seems to be \(\textsf{init}^{-}\):
+\[
+  \infer[\textsf{focus}^{u_{1}}_{L}]
+  {\Gamma \proves C}
+  {\infer[\textsf{init}^{-}]
+    {\Gamma \focsep \foc{[p]} \proves p^{-}}
+    {}}
+\]
+But then, this means that our goal \(C\) must be \(p^\), which is not the case.
+We may also distill the ``knowledge'' we just learned from this trial into a
+\textit{synthetic inference rule}:
+\[
+  \infer[]
+  {\Gamma \proves C}
+  {C = p^{-}}
+\]
+
+Similarly, if we choose to focus on \(u_{3}\), we get:
+\[
+  \infer[\textsf{focus}^{u_{3}}_{L}]
+  {\Gamma \proves C}
+  {\infer[\imp L]
+    {\Gamma \focsep \foc{[q \imp r]} \proves C}
+    {\infer[\textsf{blur}_{R}]
+      {\Gamma \proves \foc{[q]}}
+      {\Gamma \proves q}
+      &
+      \infer[\textsf{init}^{-}]
+      {\Gamma \focsep \foc{[r]} \proves r}
+      {}}}
+\]
+and the synthetic inference rule:
+\[
+  \infer[]
+  {\Gamma \proves r}
+  {\Gamma \proves q}
+\]
+This looks plausible, as our goal is indeed \(r\)!  Continue with the proof, the full
+derivation turns out to be:
+\[
+  \infer[\textsf{focus}^{u_{3}}_{L}]
+  {\Gamma \proves C}
+  {\infer[\imp L]
+    {\Gamma \focsep \foc{[q \imp r]} \proves C}
+    {\infer[\textsf{blur}_{R}]
+      {\Gamma \proves \foc{[q]}}
+      {\infer[\textsf{focus}^{u_{2}}_{L}]
+        {\Gamma \proves q}
+        {\infer[\imp L]
+          {\Gamma \focsep \foc{[p \imp q]} \proves q}
+          {\infer[\textsf{blur}_{R}]
+            {\Gamma \proves \foc{[p]}}
+            {\infer[\textsf{focus}^{u_{1}}_{L}]
+              {\Gamma \proves p}
+              {\infer[\textsf{init}^{-}]
+                {\Gamma \focsep \foc{[p]} \proves p}
+                {}}}
+            &
+            \infer[\textsf{init}^{-}]
+            {\Gamma \focsep \foc{[q]} \proves q}
+            {}}}}
+      &
+      \infer[\textsf{init}^{-}]
+      {\Gamma \focsep \foc{[r]} \proves r}
+      {}}}
+\]
+
+Intuitively, if we focus on a formula of form \(p \imp \cdots \imp s\) for proving
+\(\Gamma \proves C\), the goal \(C\) must be exactly \(s\).
+
+\section{Logic Programming in Twelf}
+
+Twelf allows us to define custom inductive types.  Here's a good example of how logic
+programming languages like Twelf generalize the above recipe to work with them.
+
+\begin{verbatim}
+nat : type.
+z : nat.
+s : nat -> nat.
+
+lt : nat -> nat -> type.
+lt/z : lt z (s N).
+lt/s : lt (s M) (s N)
+         <- lt M N.
+
+%solve two-lt-four : lt (s (s z)) (s (s (s (s z)))).
+\end{verbatim}
+
+The \texttt{two-lt-four} in the above Twelf program can be translated to
+\[
+  \Gamma \proves a < b
+\]
+where \(a = \s \s \z\) and \(b = \s \s \s \s \z\), and our context \(\Gamma\) contains the
+equivalent definitions of \texttt{lt}:
+\begin{align*}
+  \mathtt{lt/z} &: \forall n : \nat. \, zero < \s n \\
+  \mathtt{lt/s} &: \forall n : \nat. \, \forall m : \nat. \, (n < m) \imp (\s n < \s m)
+\end{align*}
+
+As usual, let's first think about the possible derivation of \(\Gamma \proves C\).  If we
+choose to focus on the \texttt{lt/s} rule, we get the derivation:
+\[
+  \infer[\textsf{focus}_{L}]
+  {\Gamma \proves C}
+  {\infer[\forall L]
+    {\Gamma \focsep \foc{[\forall n : \nat. \, \forall m : \nat. \, (n < m) \imp (\s n < \s m)]} \proves C}
+    {\Gamma \proves a : \nat
+      &
+      \infer[\forall L]
+      {\Gamma \focsep \foc{[\forall m : \nat. \, (a < m) \imp (\s a < \s m)]} \proves C}
+      {\Gamma \proves b : \nat
+        &
+        \infer[\imp L]
+        {\Gamma \focsep \foc{[(a < b) \imp (\s a < \s b)]} \proves C}
+        {\infer[\textsf{blur}_{R}]
+          {\Gamma \proves \foc{[a < b]}}
+          {\Gamma \proves a < b}
+          &
+          \Gamma \focsep \foc{[\s a < \s b]} \proves C}}}}
+\]
+
+\end{document}
