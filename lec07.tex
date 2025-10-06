@@ -191,7 +191,7 @@ The only choice for \(?\) seems to be \(\textsf{init}^{-}\):
     {\Gamma \focsep \foc{[p]} \proves p^{-}}
     {}}
 \]
-But then, this means that our goal \(C\) must be \(p^\), which is not the case.
+But then, this means that our goal \(C\) must be \(p\), which is not the case.
 We may also distill the ``knowledge'' we just learned from this trial into a
 \textit{synthetic inference rule}:
 \[
@@ -224,9 +224,9 @@ This looks plausible, as our goal is indeed \(r\)!  Continue with the proof, the
 derivation turns out to be:
 \[
   \infer[\textsf{focus}^{u_{3}}_{L}]
-  {\Gamma \proves C}
+  {\Gamma \proves r}
   {\infer[\imp L]
-    {\Gamma \focsep \foc{[q \imp r]} \proves C}
+    {\Gamma \focsep \foc{[q \imp r]} \proves r}
     {\infer[\textsf{blur}_{R}]
       {\Gamma \proves \foc{[q]}}
       {\infer[\textsf{focus}^{u_{2}}_{L}]
@@ -255,6 +255,38 @@ Intuitively, if we focus on a formula of form \(p \imp \cdots \imp s\) for provi
 
 \section{Logic Programming in Twelf}
 
+\subsection{A Quick Taste of Twelf}
+
+Let's try putting the sequent we proved above into Twelf:
+\begin{verbatim}
+p : type.
+q : type.
+r : type.
+
+%solve mypf :
+p -> (p -> q) -> (q -> r) -> (p -> r) -> r.
+
+%query 2 *
+p -> (p -> q) -> (q -> r) -> (p -> r) -> r.
+\end{verbatim}
+
+Here, we try first to \texttt{\%solve} the sequent, which will search for an inhabitant of it.
+Then, we use the \texttt{\%query} directive to ask Twelf to search for two derivations of the
+proof, with no depth limit.  It turns out that we could either focus on \(p \imp r\) or
+\(q \imp r\), and they both get us the proof.
+
+Alternatively, we can name the premises as axioms and directly solve for \(r\):
+\begin{verbatim}
+trueP : p.
+pImpQ : p -> q.
+qImpR : q -> r.
+
+%solve mypf: r.
+\end{verbatim}
+This will give us a more readable derivation with the names in place of the formulae.
+
+\subsection{Proof Search for Natural Numbers}
+
 Twelf allows us to define custom inductive types.  Here's a good example of how logic
 programming languages like Twelf generalize the above recipe to work with them.
 
@@ -265,25 +297,27 @@ s : nat -> nat.
 
 lt : nat -> nat -> type.
 lt/z : lt z (s N).
-lt/s : lt (s M) (s N)
-         <- lt M N.
+lt/s : lt N M -> lt (s N) (s M).
 
-%solve two-lt-four : lt (s (s z)) (s (s (s (s z)))).
+%solve 2<3 : lt (s (s z)) (s (s (s z))).
 \end{verbatim}
 
-The \texttt{two-lt-four} in the above Twelf program can be translated to
+The \texttt{2<3} in the above Twelf program can be translated to
 \[
   \Gamma \proves a < b
 \]
-where \(a = \s \s \z\) and \(b = \s \s \s \s \z\), and our context \(\Gamma\) contains the
+where \(a = \s \s \z\) and \(b = \s \s \s \z\), and our context \(\Gamma\) contains the
 equivalent definitions of \texttt{lt}:
 \begin{align*}
-  \mathtt{lt/z} &: \forall n : \nat. \, zero < \s n \\
+  \mathtt{lt/z} &: \forall n : \nat. \, \z < \s n \\
   \mathtt{lt/s} &: \forall n : \nat. \, \forall m : \nat. \, (n < m) \imp (\s n < \s m)
 \end{align*}
 
-As usual, let's first think about the possible derivation of \(\Gamma \proves C\).  If we
-choose to focus on the \texttt{lt/s} rule, we get the derivation:
+As usual, let's first think about the possible derivation of \(\Gamma \proves C\).
+Apparently, the goal hints that we need  to apply one of the \texttt{lt} rules.  Then,
+we recognize that the \texttt{lt/z} rule does not apply since neither of \(a\) or \(b\)
+is \(\z\).  Therefore, we can only choose to focus on the \texttt{lt/s} rule, and we get
+the derivation:
 \[
   \infer[\textsf{focus}_{L}]
   {\Gamma \proves C}
