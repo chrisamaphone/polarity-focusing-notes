@@ -2,6 +2,7 @@
 \usepackage{graphicx} % Required for inserting images
 \usepackage{proof-dashed,amsmath,amssymb,amsthm}
 \usepackage{xcolor}
+\usepackage{bbold}
 \usepackage{stmaryrd}
 \usepackage{microtype}
 \usepackage[utf8]{inputenc}
@@ -12,7 +13,11 @@
 \usepackage[T1]{fontenc}
 \usepackage{palatino}
 
-\title{Rule Sheet: Intuitionistic Sequent Calculus}
+% \setlength{\voffset}{-0.75in}
+\setlength{\headsep}{5pt}
+% \setlength{\paperheight}{1.1\paperheight}
+
+\title{Rule Sheet: Linear Sequent Calculus}
 \author{Chris Martens}
 \date{\today}
 
@@ -21,23 +26,6 @@
 \maketitle
 
 \section{Inference Rules}
-
-Judgment $\Delta \proves A$,
-where $\Delta$ is an unordered list
-of propositions $A$. We may also write $\Gamma$ as a
-context metavariable when it is clear that this does
-not represent an unrestricted context.
-
-Proposition forms $A,B,C$ include:
-\begin{itemize}
-  \item $A \tensor B$ (positive conjunction)
-  \item $A \with B$ (negative conjunction)
-  \item $A \oplus B$ (positive disjunction)
-  \item $\one$ (unit of $\tensor$/positive unit)
-  \item $\zero$ (unit of $\oplus$/positive zero)
-  \item $\top$ (unit of $\with$/negative zero)
-  \item $p$ (atomic propositions/placeholders for arbitrary propositions)
-\end{itemize}
 
 Tensor:
 \[
@@ -101,17 +89,28 @@ Implication (lolli):
 \]
 
 
-Multiplicative unit:
+Positive unit:
+\[
+  \infer[\one R]
+  {\Delta \proves \one}
+  {\Delta = \cdot}
+  \qquad
+  \infer[\one L]
+  {\Delta, \one \proves C }
+  {\Delta \proves C}
+\]
+
+Negative and positive zero:
 \[
   \infer[\top R]
-  {\Gamma \proves \top}{}
+  {\Delta \proves \top}{}
   \qquad
   \mathrm{(no\ \top L)}
   \qquad
-  \mathrm{(no\ \bot R)}
+  \mathrm{(no\ \zero R)}
   \qquad
-  \infer[\bot L]
-  {\Gamma, \bot \proves C} {}
+  \infer[\zero L]
+  {\Delta, \zero \proves C} {}
 \]
 
 
@@ -121,6 +120,25 @@ Identity rule:
   {A \proves A}
   {}
 \]
+
+\section{Syntax}
+
+Judgment $\Delta \proves A$,
+where $\Delta$ is an unordered list
+of propositions $A$. We may also write $\Gamma$ as a
+context metavariable when it is clear that this does
+not represent an unrestricted context.
+
+Proposition forms $A,B,C$ include:
+\begin{itemize}
+  \item $A \tensor B$ (positive conjunction)
+  \item $A \with B$ (negative conjunction)
+  \item $A \oplus B$ (positive disjunction)
+  \item $\one$ (unit of $\tensor$/positive unit)
+  \item $\zero$ (unit of $\oplus$/positive zero)
+  \item $\top$ (unit of $\with$/negative zero)
+  \item $p$ (atomic propositions/placeholders for arbitrary propositions)
+\end{itemize}
 
 
 \bibliographystyle{plainnat}
