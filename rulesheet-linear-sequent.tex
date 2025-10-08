@@ -1,0 +1,129 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\usepackage[T1]{fontenc}
+\usepackage{palatino}
+
+\title{Rule Sheet: Intuitionistic Sequent Calculus}
+\author{Chris Martens}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Inference Rules}
+
+Judgment $\Delta \proves A$,
+where $\Delta$ is an unordered list
+of propositions $A$. We may also write $\Gamma$ as a
+context metavariable when it is clear that this does
+not represent an unrestricted context.
+
+Proposition forms $A,B,C$ include:
+\begin{itemize}
+  \item $A \tensor B$ (positive conjunction)
+  \item $A \with B$ (negative conjunction)
+  \item $A \oplus B$ (positive disjunction)
+  \item $\one$ (unit of $\tensor$/positive unit)
+  \item $\zero$ (unit of $\oplus$/positive zero)
+  \item $\top$ (unit of $\with$/negative zero)
+  \item $p$ (atomic propositions/placeholders for arbitrary propositions)
+\end{itemize}
+
+Tensor:
+\[
+  \infer[\tensor R]
+  {\Delta_1, \Delta_2 \proves A \tensor B}
+  {\Delta_1 \proves A
+  &
+  \Delta_2 \proves B}
+\qquad
+  \infer[\tensor L]
+  {\Delta, A \tensor B \proves C}
+  {\Delta, A, B \proves C}
+\]
+
+With:
+\[
+  \infer[\with R]
+  {\Delta \proves A \with B}
+  {\Delta \proves A
+    &
+   \Delta \proves B}
+\qquad
+  \infer[\with L_1]
+  {\Delta, A \with B \proves C}
+  {\Delta, A \proves C}
+\qquad
+  \infer[\with L_2]
+  {\Delta, A \with B \proves C}
+  {\Delta, B \proves C}
+\]
+
+Disjunction (oplus):
+\[
+  \infer[\oplus R_1]
+  {\Delta \proves A \oplus B}
+  {\Delta \proves A}
+\qquad
+  \infer[\oplus R_2]
+  {\Delta \proves A \oplus B}
+  {\Delta \proves B}
+\qquad
+  \infer[\oplus L]
+  {\Delta, A \oplus B \proves C}
+  {\Delta, A \proves C
+   &
+   \Delta, B \proves C
+  }
+\]
+
+Implication (lolli):
+\[
+  \infer[\lolli R]
+  {\Delta \proves A \lolli B}
+  {\Delta, A \proves B}
+\qquad
+  \infer[\lolli L]
+  {\Delta_1, \Delta_2, A \lolli B \proves C}
+  {\Delta_1 \proves A
+  &
+  \Delta_2, B \proves C}
+\]
+
+
+Multiplicative unit:
+\[
+  \infer[\top R]
+  {\Gamma \proves \top}{}
+  \qquad
+  \mathrm{(no\ \top L)}
+  \qquad
+  \mathrm{(no\ \bot R)}
+  \qquad
+  \infer[\bot L]
+  {\Gamma, \bot \proves C} {}
+\]
+
+
+Identity rule:
+\[
+  \infer[\mathsf{id}]
+  {A \proves A}
+  {}
+\]
+
+
+\bibliographystyle{plainnat}
+\bibliography{main}
+
+\end{document}
