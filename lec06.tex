@@ -1,0 +1,467 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\newcommand{\bnfor}{\ |\ }
+\newcommand{\focsep}{\,|\,}
+\newcommand{\hlbox}[1]{\colorbox{yellow}{$#1$}}
+
+\title{Lecture 6: Intro to Focusing}
+\author{Joseph Rotella}
+\date{September 24, 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Lecture outline:
+\begin{itemize}
+    \item Invertibility
+    \item Focusing as a proof search strategy
+    \item Focused sequent calculus
+    \item Quantifiers
+\end{itemize}
+
+\section{Defining Invertibility}
+
+\subsection{Sequent Calculus, Revisited}
+
+At the end of the last lecture, we were considering which rule we should first apply in a proof of
+the following sequent:
+\begin{equation}
+  \label{eq:6-multi-choice}
+  p \iand q \imp r, p \iand s \proves p \imp r
+\end{equation} 
+We could apply ${\imp} L$, ${\imp} R$, or one of two ${\iand} L$ rules. However, there is a certain
+difference in kind between the first and latter two rules: if we apply ${\imp} L$, we might (and,
+in fact, will) end up discovering that we can't prove $p \iand q$, leading us to a dead end in our
+proof, even though we might be able to obtain $r$ in some other way. On the other hand, destructing
+one of the conjunctions or moving $p$ to the antecedent doesn't force us to make a commitment to a
+certain (possibly erroneous) direction in our proof---applying these rules ``can't hurt.''
+
+\subsection{Invertibility}
+
+The intuitive notion of a ``non-committal'' rule is made precise by the concept of
+\emph{invertibility}. We say that a rule is \emph{invertible} if its conclusion implies all of its
+premises. This captures our previous intuition of rules that do not ``lose information'' or make us
+commit to a ``narrower path'' within our proof, since we can always recover the sequent from which
+we started.
+
+We illustrate invertibility with some examples. An example of an invertible rule is the conjunction
+right rule:
+
+\[
+  \infer[\iand R]
+  {\Gamma \proves A \iand B}
+  {\Gamma \proves A
+  &
+  \Gamma \proves B}
+\]
+
+To show that this is so, we must show that each of the rule's premises follows from its
+conclusion, i.e., that both of the following rules are admissible:
+
+\[
+  \infer-
+  {\Gamma \proves A}
+  {\Gamma \proves A \iand B}
+  \qquad
+  \infer-
+  {\Gamma \proves B}
+  {\Gamma \proves A \iand B}
+\]
+
+We show the first derivation only, since the second is symmetric. Using cut, we obtain $A \iand B$
+in our antecedent; the appropriate conjunction left rule then allows us to obtain $A$:
+
+\[
+  \infer-[\mathsf{cut}]
+  {\Gamma \proves A}
+  {\deduce{\Gamma \proves A \iand B}{}
+   &
+   \infer[\iand L_1]
+   {\Gamma, A \iand B \proves A}
+   {\infer[\mathsf{id}_A]
+     {\Gamma, A \iand B, A \proves A}
+     {}
+   }
+  }
+\]
+
+As we intuited in the initial example (\ref{eq:6-multi-choice}), an example of a \emph{non}-invertible
+rule is ${\imp} L$:
+
+\[
+  \infer[{\imp} L]
+  {\Gamma, A \imp B \proves C}
+  {\Gamma, A \imp B \proves A
+  &
+  \Gamma, A \imp B, B \proves C}
+\]
+
+Were this rule invertible, the following rule (from the first premise) would be admissible:
+\[
+  \infer-[\textcolor{red}{\text{(Invalid)}}]
+  {\Gamma, A \imp B \proves A}
+  {\Gamma, A \imp B \proves C}
+\]
+Since the provability of $C$ in the premise need not have any bearing on the provability of $A$ in
+the conclusion, this rule effectively asserts that an implication's antecedent is provable from the
+implication itself, which is not generally true. Consider the case where $A$ is $\bot$, $B$ is
+$\top$, and $C$ is provable: we have that $\bot \imp \top \proves C$ is derivable, but $\bot \imp
+\top \proves \bot$ is not.
+
+Our full collection of rules is categorized by invertibility as follows:
+
+\begin{itemize}
+  \item Invertible: ${\iand} R$, ${\iand} L_1$, ${\iand} L_2$, ${\ior} L$, ${\imp} R$,
+        $\mathsf{id}$, $\bot L$, $\top R$
+  \item Noninvertible: $\ior R_1$, $\ior R_2$, ${\imp} L$
+\end{itemize}
+
+\begin{exercise}
+Show that the implication right rule is invertible and that the disjunction right rules are not.
+\end{exercise}
+
+\section{What Is Focusing?}
+
+A key feature of invertible rules we identified in the initial example (\ref{eq:6-multi-choice}) is
+that they never need to be \emph{backtracked} during proof search---they can always be freely
+applied. In contrast, as we saw with ${\imp} R$, noninvertible rules may force us to commit to a
+dead-end path in our search from which we will need to backtrack.
+
+This view motivates the following approach to proof search: we should eagerly apply invertible
+rules, and delay the application of noninvertible rules until we have finished applying invertible
+ones. We refine this approach into a two-phase strategy: we alternate between exhaustively applying
+all invertible rules and exhaustively applying noninvertibles rules only to a particular
+\emph{focused} subformula and the subformulas that arise from those applications. A rough outline
+of the procedure follows; we will refine this later when we have introduced additional terminology:
+
+\begin{enumerate}
+  \item \emph{Inversion}: Apply all applicable invertible rules
+  \item \emph{Focusing}: Pick a place $A$ to focus
+  \item \emph{Focusing (cont.)}: Maintain focus on subformulas of $A$ arising from noninvertible
+  rule applications until no more noninvertible rules apply
+  \item Go back to inversion
+\end{enumerate}
+
+Focusing aims to reduce the nondeterminism present in sequent-calculus proof search. To be sure,
+this strategy does not entirely eliminate nondeterminism and the attendant possibility of needing to
+backtrack: at any point during the focusing phase, we may apply an erroneous noninvertible rule that
+leads us to a dead-end branch of the search tree. Nonetheless, it confines nondeterministic (and
+potentially erroneous) choices to the focusing phase, as one can think of rules in the inversion
+phase as being applied ``in parallel'' and thus deterministically (in practice, we may fix an
+ordering in which to apply invertible rules).
+
+Furthermore, this search procedure is complete for the intuitionistic sequent calculus. Since we
+will realize our focused proof search through an alternative calculus of sequents $\Gamma
+\proves^{\mathsf{foc}} A$ that enforces focusing, we state (but do not prove) this completeness
+property as follows:
+
+\begin{proposition}[Completeness of Focusing]
+If $\Gamma \proves A$, then $\Gamma \proves^{\mathsf{foc}} A$.
+\end{proposition}
+
+To motivate our development of a focused sequent calculus, consider the following informal example
+of applying the above strategy to deriving the sequent
+$p \iand q \imp r, p \iand s \proves q \imp r$:
+
+\[
+  \infer-[\land L_1, \land L_2, {\imp} R]
+    {p \iand q \imp r, p \iand s \proves q \imp r}
+    {\infer[{\imp} L]
+      {\Gamma := \hlbox{p \iand q \imp r}, p \iand s, p, s, q \proves r}
+      {\infer-[\text{blur}]
+        {\Gamma \proves \hlbox{p \iand q}}
+        {\infer[\iand R]
+          {\Gamma \proves p \iand q}
+          {\infer[\mathsf{id}_p]{\Gamma \proves p}{}}}
+       \qquad
+       \infer-[\text{blur}]
+        {\Gamma, \hlbox{r} \proves r}
+        {\infer[\mathsf{id}_r]{\Gamma, r \proves r}{}}}}
+\]
+
+We begin with the inversion phase, consolidated into the first inference. With no applicable
+invertible rules remaining, we apply the noninvertible implication left rule, focusing $p \land q
+\imp r$ and the subformulas arising therefrom (indicated with highlighting). Neither subsequent
+sequent admits a noninvertible rule application, so we \emph{blur}---i.e., ``drop focus''---and once
+more apply invertible rules, which in each case discharges our remaining obligations.\footnote{In
+the derivation, we write ``blur'' in serif type and with a dashed inference line to indicate its
+informality; our actual blurring rules will be defined as part of a focused sequent calculus.}
+
+\section{A Focused Sequent Calculus}
+
+\subsection{Polarity}
+
+For our development of a focused sequent calculus, it will be helpful to think about
+invertibility properties at the level of connectives rather than individual rules: when do
+(non)invertible rules apply to a formula with a given connective on a given side of a sequent?
+\emph{Polarity} serves to categorize connectives in this manner.
+
+We say that a connective is \emph{positive} if its left rules are invertible, and we say that it is
+\emph{negative} if its right rules are invertible. We list the polarities of each connective below
+(we noted in class that one could argue that $\bot$ is vacuously negative, but, as the unit of
+disjunction---which is positive---it is naturally treated as positive):
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{c|c|c}
+    & Positive & Negative \\
+    \hline
+    $\iand$ & \checkmark & \checkmark \\
+    $\ior$ & \checkmark & \\
+    $\imp$ & & \checkmark \\
+    $\top$ & $\checkmark$ & \checkmark \\
+    $\bot$ & \checkmark &
+  \end{tabular}
+\end{table}
+
+While truth and conjunction are both bipolar, it will be desirable for our development of a focused
+sequent calculus to assign to every connective a unique polarity. This is because we will treat
+connectives differently based on their polarity, and having to choose among ambiguous polarities for
+a connective introduces a source of nondeterminism---the very thing we are seeking to minimize---%
+into our system. Therefore, in the following development, we will treat truth and conjunction as
+negative (the alternative is considered in an exercise).
+
+Similarly, propositional atoms are not \emph{a priori} endowed with a particular polarity. For the
+moment, we will opt to treat them as negative, though a development with positively polarized atoms
+is also possible; we will see later the consequences of this decision.
+
+\begin{exercise}
+Think about what it would look like to have a connective that is \emph{neither} positive nor
+negative. Why would this be interesting? Try to design such a connective, and discuss your findings.
+\end{exercise}
+
+\subsection{Judgments, Grammar, and Inference Rules}
+
+Our polarized sequent calculus comprises three forms of judgment, allowing us to specify when a
+sequent is in focus:
+\[
+  \Gamma \proves A \text{ (inversion)} \qquad
+  \Gamma \focsep [A] \proves C \text{ (left focus)} \qquad
+  \Gamma \proves [C] \text{ (right focus)}
+\]
+We pass between these judgments using \emph{focusing} and \emph{blurring} rules, defined shortly. We
+also informally define a judgment $\Gamma \proves A \textsf{ stable}$ that says that $\Gamma \proves
+A$ has had all applicable invertible rules applied.
+
+Connectives' polarities are directly encoded in our grammar. In a future lecture, we will refine
+this grammar to eliminate the need for unpolarized formulas.
+\begin{alignat*}{2}
+  &A, B ::= A^+ \bnfor A^- &&\text{formulas}\\
+  &A^+, B^+ ::= A \lor B \bnfor \bot &&\text{positive connectives}\\
+  &A^-, B^- ::= A \land B \bnfor A \imp B \bnfor \top \bnfor p \quad &&\text{negative connectives}
+\end{alignat*}
+
+Equipped with the vocabulary of polarity, we can rephrase our earlier proof-search ``recipe'':
+
+\begin{enumerate}
+  \item \emph{Inversion}: Apply invertible rules \underline{until a stable sequent is reached}
+  \item \emph{Focusing}: Pick a place $A$ to focus
+  \item \emph{Focusing (cont.)}: Maintain focus on subformulas of $A$ arising from noninvertible
+  rule applications until \underline{reaching a sequent of the form $\Gamma \proves [A^-]$ or}
+  \underline{$\Gamma \focsep [A^+] \proves C$}
+  \item Go back to inversion
+\end{enumerate}
+
+Notice that our rewrite of step (3) is justified by the fact that negative connectives have
+invertible right rules, so that a focused formula with a negative connective on the right-hand side
+will have no applicable noninvertible rules, and symmetrically for positive connectives on the left.
+
+The rules of our focused sequent calculus, shown below, differentiate and provide mechanisms for
+passing between these two phases of proof search. Notice that the $\mathsf{foc} L$ rule now ensures
+that focused formulas in the antecedent are retained in the ``unfocused'' portion of the context, so
+we drop principal-formula propagation from our noninvertible left rules. The new and modified rules
+are highlighted:
+
+\begin{equation*}
+\begin{gathered}
+  \infer[\hlbox{\mathsf{foc} R}]
+    {\Gamma \proves A^+}
+    {\Gamma \proves A^+ \textsf{ stable}
+    &
+    \Gamma \proves [A^+]}
+  \qquad
+  \infer[\hlbox{\mathsf{foc} L}]
+    {\Gamma, A^- \proves C}
+    {\Gamma, A^- \proves C \textsf{ stable}
+    &
+    \Gamma, A^- \focsep [A^-] \proves C}
+  \\
+  \infer[\iand R]
+    {\Gamma \proves A \iand B}
+    {\Gamma \proves A
+      &
+      \Gamma \proves B}
+  \qquad
+  \infer[\hlbox{\iand L_1}]
+    {\Gamma \focsep [A \iand B] \proves C}
+    {\Gamma \focsep [A] \proves C}
+  \qquad
+  \infer[\hlbox{\iand L_2}]
+    {\Gamma \focsep [A \iand B] \proves C}
+    {\Gamma \focsep [B] \proves C}
+  \\
+  \infer[\hlbox{\ior R_1}]
+    {\Gamma \proves [A \ior B]}
+    {\Gamma \proves [A]}
+  \qquad
+  \infer[\hlbox{\ior R_2}]
+    {\Gamma \proves [A \ior B]}
+    {\Gamma \proves [B]}
+  \qquad
+  \infer[\ior L]
+    {\Gamma, A \ior B \proves C}
+    {\Gamma, A \ior B, A \proves C
+    &
+    \Gamma, A \ior B, B \proves C
+    }
+  \\
+  \infer[{\imp} R]
+    {\Gamma \proves A \imp B}
+    {\Gamma, A \proves B}
+  \qquad
+  \infer[\hlbox{{\imp} L}]
+    {\Gamma, A \imp B \proves C}
+    {\Gamma \proves [A]
+    &
+    \Gamma \focsep [B] \proves C}
+  \\
+  \infer[\top R]
+    {\Gamma \proves \top}{}
+  \qquad
+  \infer[\bot L]
+    {\Gamma, \bot \proves C} {}
+  \\
+  \infer[\hlbox{\mathsf{blur} L}]
+    {\Gamma \focsep [A^+] \proves C}
+    {\Gamma, A^+ \proves C}
+  \qquad
+  \infer[\hlbox{\mathsf{blur} R}]
+    {\Gamma \proves [A^-]}
+    {\Gamma \proves A^-}
+  \\
+  \infer[\hlbox{\mathsf{id}^-}]
+    {\Gamma \focsep [p] \proves p}
+    {}
+\end{gathered}
+\end{equation*}
+
+
+\begin{exercise}
+Write the rules for conjunction treated as a positive connective.
+\end{exercise}
+
+As an example, we provide a focused proof of $p, p \imp q, q \imp r, s \imp r \proves r$, eliding
+stability judgments (and letting $\Gamma := p, p \imp q, q \imp r, s \imp r$):
+\begin{equation}
+  \begin{aligned}
+  \label{eq:6-focused-proof}
+  \infer[\mathsf{foc} L]
+    {p, p \imp q, q \imp r, s \imp r \proves r}
+    {\infer[{\imp} L]
+      {\Gamma \focsep [q \imp r] \proves r}
+      {\infer[\mathsf{blur} R]
+        {\Gamma \proves [q]}
+        {\infer[\mathsf{foc} L]
+          {\Gamma \proves q}
+          {\infer[{\imp} L]
+            {\Gamma \focsep [p \imp q] \proves q}
+            {\infer[\mathsf{blur} R]
+              {\Gamma \proves [p]}
+              {\infer[\mathsf{foc} L]
+                {\Gamma \proves p}
+                {\infer[\mathsf{id}^-]
+                  {\Gamma \focsep [p] \proves p}
+                  {}}}
+             &
+             \infer[\mathsf{id}^-]
+              {\Gamma \focsep [q] \proves q}
+              {}
+            }
+          }}
+       &
+       \infer[{\mathsf{id}^-}]{\Gamma \focsep [r] \proves r}{}
+      }
+    }
+  \end{aligned}
+\end{equation}
+
+\begin{exercise}
+  Give a focused proof of the following sequent:
+  \[ (p \imp q) \ior (p \imp r) \proves p \imp (q \ior r) \]
+  
+  Is there more than one possible proof? If so, explain why.
+\end{exercise}
+
+Notice that the above proof (\ref{eq:6-focused-proof}), structured as such, would not succeed if our
+atoms were positively polarized. In particular, we would be unable to derive $\Gamma \proves [q]$
+after the first ${\imp} L$ step, since $\mathsf{blur} R$ would be inapplicable with the positively
+polarized $q$ on the right-hand side. In other words, with positively polarized atoms, we must
+already have an atom in the antecedent before it arises in the consequent of a sequent. This is
+reflected in the identity rule for positively polarized atoms:
+
+\[
+\infer[\mathsf{id}^+]
+  {\Gamma, p \proves [p]}
+  {}
+\]
+
+To restructure the proof (\ref{eq:6-focused-proof}) for positively polarized atoms, we would need to
+ensure that, whenever we apply one of the implication left rules, the antecedent of the implication
+is already present in our context. Accordingly, rather than beginning by reasoning backwards from
+the consequent $r$ in our derivation, we would instead need to reason forward through the sequence
+of implications starting with $p \imp q$, whose antecedent $p$ is already known, then proceeding to
+$q \imp r$ once $q$ has been added to the left-hand side. In other words, positively polarizing
+atoms yields a \emph{forward chaining} proof structure, proceeding from hypotheses to goal; the
+negatively polarized approach above yields \emph{backward chaining}, working from goal to
+hypotheses.
+
+\section{Quantifiers}
+
+We now move from propositional to first-order logic. In this lecture, we will begin by adding the
+universal quantifier to our logic; next time, we will consider existentials and focused inference
+rules for quantifiers.
+
+To support quantification, we must extend our grammar with objects $a, b, c$, types $\tau$, and a
+judgment $t : \tau$ that ascribes to $t$ the type $\tau$. Quantified variables are typed: we write
+$\forall x : \tau.\, A_x$ for universal quantification, where the subscript $x$ denotes that that
+variable may appear free in $A$. The inference rules for universal quantification are as follows:
+
+\[
+\infer[\forall R]
+  {\Gamma \proves \forall x : \tau.\, A}
+  {\Gamma, a : \tau \proves A[a/x]}
+\qquad
+\infer[\forall L]
+  {\Gamma, \forall x : \tau.\, A \proves C}
+  {\Gamma, \forall x : \tau.\, A \proves t : \tau
+   &
+   \Gamma, \forall x : \tau.\, A, A[t/x] \proves C}
+\]
+
+Intuitively, to show $\forall x : \tau.\, A$ on the right, we must show $A$ for an arbitrary object
+of the appropriate type; to use $\forall x : \tau.\, A$ on the left, we can exploit the fact that 
+$A$ holds for any particular object of type $\tau$.
+
+If one squints, the broad shapes of these rules look reminiscent of those for implication. And,
+indeed, one can show that, like implication, the universal quantifier is negative.
+
+\begin{exercise}
+Show that the universal quantifier is negative.
+\end{exercise}
+
+\bibliographystyle{plainnat}
+\bibliography{main}
+
+\end{document}
