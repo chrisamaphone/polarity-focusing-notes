@@ -1,0 +1,360 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\usepackage{bbold}
+
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+
+% Borrowed from Joseph's lec06.
+\newcommand*{\bnfor}{\mid}
+\newcommand*{\focsep}{\,\vert\,}
+\newcommand*{\foc}[1]{\mathcolor{red}{#1}}
+\newcommand*{\nat}{\operatorname{\textsf{nat}}}
+\newcommand*{\s}{\operatorname{\textsf{suc}}}
+\newcommand*{\z}{\operatorname{\textsf{zero}}}
+
+\title{Lecture 10: Focused Linear Logic}
+\author{Chris Martens}
+\date{October 8, 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Lecture outline:
+\begin{itemize}
+\item Warmup: linear logic
+\item Focusing as a proof technique
+\item Polarizing linear logic propositions
+\item Focusing linear logic
+\end{itemize}
+
+\section{Warmup}
+
+Prove the following sequent in linear logic:
+
+\[
+  \cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)
+\]
+
+Here is one solution:
+
+\[
+  \infer[\lolli R]
+{
+  \cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)
+}{
+  \infer[\lolli R]
+  {p \with q \proves (r \with s) \lolli p \tensor r}
+  {\infer[\with L_1]
+   {p \with q, r \with s \proves p \tensor r}
+   {\infer[\with L_1]
+    {p, r \with s \proves p \tensor r}
+    {
+      \infer[\tensor R]
+      {p, r \proves p \tensor r}
+      {\infer[\mathsf{id}]{p \proves p}{}
+      & \infer[\mathsf{id}]{r \proves r}{}
+      }
+    }
+   }
+  }
+}
+\]
+
+\begin{exercise}
+ Both $\tensor R$ and $\with L$ are non-invertible rules.
+  Give another proof of the same proposition
+  ($\cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)$)
+  where they are used in the other order.
+\end{exercise}
+
+\section{Focusing as a proof technique}
+
+Last time, we claimed that linear logic was {\em more general} 
+than affine logic, which permits weakening (but not contraction).
+To make this claim precise, we could give an encoding of 
+sequents in affine logic into linear.
+Perhaps as follows:
+
+\[
+  \ulcorner \Gamma \proves^{\mathsf{aff}} A \urcorner
+  =
+  \Gamma \proves A \tensor \top
+\]
+
+We then need to show that this translation is sound
+in the sense that translated sequents admit weakening.
+This would mean: whenever $\Gamma \proves A \tensor \top$,
+it is also the case that for a arbitrary proposition
+$B$, we have $\Gamma, B \proves A \tensor \top$.
+
+Unfortunately, we cannot only consider the case where
+our input derivation has the form
+
+\[
+  \infer[\tensor R]
+  {\Gamma \proves A \tensor \top}
+  {\deduce{\Gamma_1 \proves A}{\DD_1}
+  &
+  \deduce{\Gamma_2 \proves \top}{\DD_2}
+  &
+  \Gamma = \Gamma_1, \Gamma_2}
+\]
+
+If we could, then the proof would be done by constructing
+a proof of the weakened sequent as:
+
+\[
+  \infer[\tensor R]
+  {\Gamma, B \proves A \tensor \top}
+  {\deduce{\Gamma_1 \proves A}{\DD_1}
+  &
+  \infer[\top R]{\Gamma_2, B \proves \top}{}
+  &
+  \Gamma = \Gamma_1, \Gamma_2, B}
+\]
+
+But without further information, we would also have
+to consider every possible left rule...
+a focused logic drastically reduces the search
+space of possible proofs, allowing us
+to make this argument by considering the 
+structure of the derivation at the level
+of alternating focus-inversion phases.
+
+(TODO: make this argument more carefully. The proof still isn't trivial.)
+
+% TODO continue.
+
+\section{Polarizing Linear Logic Propositions}
+
+We observe that each connective has exactly one of its
+{\em left rules} or {\em right rules} invertible;
+this gives us an unambiguous polarization for each
+connective.
+
+Furthermore, if we choose to maintain focus as long as
+possible, we can deterministically assign polarity to 
+each subformula.
+
+This gives us a way to stratify propositions into positives
+and negatives, with {\em shift} operators that embed
+each polarity into the other:
+
+\begin{itemize}
+  \item Positives $A^+ ::= A^+ \tensor B^+ \mid \one 
+          \mid A^+ \oplus B^+ \mid \zero \mid p^+ \mid \dshift A^-$
+  \item Negatives $A^- ::= A^- \with B^- \mid \top
+          \mid A^+ \lolli B^- \mid p^- \mid \ushift A^+$
+\end{itemize}
+
+\section{Focused Linear Logic}
+
+The following development is based on Simmons' ``structural focalization''
+for intuitionistic logic~\cite{simmons2014structural}, including
+the idea of suspended atomic propositions, which are more fully
+explained in that text.
+
+Previously, when writing down rules for a focused calculus, we 
+had premises like $\Gamma \proves A \ \mathsf{stable}$
+to indicate when it was permissible to move from an inversion
+phase to a focus phase.
+We would like to write down a calculus with a more syntactic
+criterion for stability. We do this by introducing an ordered
+{\em inversion context} consisting of propositions that must
+be decomposed before transitioning into a focus phase.
+Stability can then be defined as the inversion context being
+empty and the goal proposition being ``stable'', which is a
+syntactic property applying only to positive propositions
+and suspended negative atoms (i.e. propositions with no further
+right-inversions).
+
+% TODO: explain suspended atomics
+
+Inversion contexts have the following grammar and are treated as
+{\em ordered sequences} rather than multisets:
+\[
+  \Omega ::= \cdot \mid A^+, \Omega
+\]
+
+The judgments are as follows:
+\begin{itemize}
+  \item $\Delta; [A^-] \proves U$ (Left focus; $U$ stable)
+  \item $\Delta \proves [A^+]$ (Right focus)
+  \item $\Delta; \Omega \proves A$ (Inversion)
+\end{itemize}
+
+Right inversion:
+all right inversion rules require an empty inversion
+context, forcing left-inversions to happen first.
+\[
+  \infer[\with R]
+  {\Delta; \cdot \proves A^- \with B^-}
+  {\Delta; \cdot \proves A^-
+   &
+   \Delta; \cdot \proves B^-}
+\qquad
+  \infer[\top R]
+  {\Delta; \cdot \proves \top}{}
+\]
+
+\[
+  \infer[\lolli R]
+  {\Delta; \cdot \proves A^+ \lolli B^-}
+  {\Delta; A^+ \proves B^-}
+\]
+
+Upshift-right and 
+suspending negative atoms:
+\[
+ \infer[\ushift R]
+ {\Delta; \cdot \proves \ushift{A^+}}
+ {\Delta; \cdot \proves A^+}
+\qquad
+\infer[\mathsf{sus}^-]
+  {\Delta; \cdot \proves p^-}
+  {\Delta; \cdot \proves \langle p^- \rangle}
+\]
+
+Left inversion: decomposing positive
+connectives on the left, including shifts
+(which move negatives to the regular context)
+and suspending positive atoms.
+
+% tensor, 1, oplus, 0, downshift
+\[
+  \infer[\tensor L]
+  {\Delta; A^+\tensor B^+, \Omega \proves C}
+  {\Delta; A^+, B^+, \Omega \proves C}
+  \qquad
+  \infer[\one L]
+  {\Delta; \one, \Omega \proves C}
+  {\Delta; \Omega \proves C}
+\]
+\[
+  \infer[\oplus L]
+  {\Delta; A^+\oplus B^+, \Omega \proves C}
+  {\Delta; A^+, \Omega \proves C
+  &
+  \Delta; B^+, \Omega \proves C}
+  \qquad
+  \infer[\zero L]
+  {\Delta; \zero, \Omega \proves C}{}
+\]
+
+Downshift-left and suspended atomics:
+\[
+  \infer[\dshift L]
+  {\Delta; \dshift A^-, \Omega \proves C}
+  {\Delta, A^-; \Omega \proves C}
+  \qquad
+  \infer[\mathsf{sus}^+]
+  {\Delta; p^+, \Omega \proves C}
+  {\Delta, \langle p^+ \rangle; \Omega \proves C}
+\]
+
+Moving from inversion to focus:
+\[
+  \infer[\mathsf{foc} R]
+  {\Delta; \cdot \proves A^+}
+  {\Delta \proves [A^+]}
+  \qquad
+  \infer[\mathsf{foc} L]
+  {\Delta, A^-; \cdot \proves U}
+  {U\ \mathsf{stable}
+    &
+    \Delta; [A^-] \proves U}
+  \qquad
+  \infer{A^+\ \mathsf{stable}}{}
+  \qquad
+  \infer{\langle p^- \rangle\ \mathsf{stable}}{}
+\]
+
+Left focus:
+% lolli left, with left, upshift, neg atom
+\[
+  \infer[\lolli L]
+  {\Delta; [A^+ \lolli B^-] \proves U}
+  {\Delta \proves [A^+]
+  &
+  \Delta; [B^-] \proves U}
+  \qquad
+  \infer[\with L_1]
+  {\Delta; [A^- \with B^-] \proves U}
+  {\Delta; [A^-] \proves U}
+  \qquad
+  {\Delta; [A^- \with B^-] \proves U}
+  {\Delta; [B^-] \proves U}
+\]
+
+Upshift-left puts us back into left inversion:
+\[
+  \infer[\ushift L]
+  {\Delta; [\ushift{A^+}] \proves U}
+  {\Delta; A^+ \proves U}
+\]
+
+\[
+  \infer[\mathsf{id}^-]
+  {\Delta; [p^-] \proves \langle p^- \rangle}
+  {\Delta = \cdot}
+\]
+
+Right focus:
+% tensor right, one right, oplus right x2, downshift, pos atom
+\[
+  \infer[\tensor R]
+  {\Delta \proves [A^+ \tensor B^+]}
+  {\Delta \proves [A^+]
+   &
+   \Delta \proves [B^+]
+  }
+  \qquad
+  \infer[\one R]
+  {\Delta \proves [\one]}
+  {\Delta = \cdot}
+\]
+
+\[
+  \infer[\oplus R_1]
+  {\Delta \proves [A^+ \oplus B^+]}
+  {\Delta \proves [A^+]}
+  \qquad
+  \infer[\oplus R_2]
+  {\Delta \proves [A^+ \oplus B^+]}
+  {\Delta \proves [B^+]}
+\]
+
+Downshift-right puts us back into right inversion:
+\[
+  \infer[\dshift R]
+  {\Delta \proves [\dshift A^-]}
+  {\Delta; \cdot \proves A^-}
+\]
+
+\begin{exercise}
+Translate your proof of
+  \[
+    \cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)
+  \]
+from the previous exercise, choosing an appropriate polarization
+for the atomic propositions. Explain how the structure of the proof
+forces such a polarization.
+\end{exercise}
+
+
+\bibliographystyle{plainnat}
+\bibliography{main}
+
+
+\end{document}

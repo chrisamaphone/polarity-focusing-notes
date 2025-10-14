@@ -28,8 +28,10 @@
 \newcommand{\ifalse}{\bot}
 
 % Shifts
-\newcommand{\ushift}[2]{\uparrow\smash{{}^{#2}_{#1}}}
-\newcommand{\dshift}[2]{\downarrow\smash{{}^{#1}_{#2}}}
+% \newcommand{\ushift}[2]{\uparrow\smash{{}^{#2}_{#1}}}
+% \newcommand{\dshift}[2]{\downarrow\smash{{}^{#1}_{#2}}}
+\newcommand{\ushift}[1]{\uparrow{#1}}
+\newcommand{\dshift}[1]{\downarrow{#1}}
 
 % Judgments
 \newcommand{\istrue}{\ \mathsf{true}}
