@@ -1,0 +1,112 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\usepackage{bbold}
+\usepackage{mathtools}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\title{Assignment 2: Focusing and Polarity}
+\author{Chris Martens}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+This assignment covers exercises from lectures 6 through 9.
+
+\section{Lecture 6 Exercises}
+\begin{exercise}
+Show that the implication right rule is invertible and that the disjunction right rules are not.
+\end{exercise}
+
+\begin{exercise}
+Think about what it would look like to have a connective that is \emph{neither} positive nor
+negative. Why would this be interesting? Try to design such a connective, and discuss your findings.
+\end{exercise}
+
+
+\begin{exercise}
+  Write the rules for (intuitionistic) conjunction treated as a positive connective.
+\end{exercise}
+
+
+\begin{exercise}
+  Give a focused proof of the following sequent:
+  \[ (p \imp q) \ior (p \imp r) \proves p \imp (q \ior r) \]
+  
+  Is there more than one possible proof? If so, explain why.
+\end{exercise}
+
+
+\begin{exercise}
+Show that the universal quantifier is negative.
+\end{exercise}
+
+
+\section{Lecture 7 Exercises}
+
+(None given)
+
+
+\section{Lecture 8 Exercises}
+
+
+\begin{exercise}
+  Prove the linear logic sequent 
+  \[\cdot \proves A \lolli B \lolli C \proves A \tensor B \lolli C\]
+\end{exercise}
+
+The following were not given as exercises in class, but can be helpful
+for testing your understanding of linear logic.
+
+\newcommand{\eqhuh}{\xLeftrightarrow{\text{?}}}
+
+\begin{exercise}
+  For each of the below schema, state whether one can be proven from the
+  other,
+  both can be proven from each other, or neither.
+  Check your work with proofs (but you do not need to include your proofs
+  in your hand-in).
+  \begin{enumerate}
+    \item $A \oplus A \eqhuh (\one \oplus \one) \tensor A$
+    \item $A \tensor (B \oplus C) \eqhuh (A \tensor B) \oplus (A \tensor
+      C$
+    \item $A \with B \eqhuh A \oplus B$
+    \item $A \with (B \oplus C) \eqhuh (A \with B) \oplus (A \with C)$
+    \item $(A \with B) \oplus (A \with C) \eqhuh A \with (B \oplus C)$
+    \item $A \oplus B \lolli C \eqhuh (A \lolli C) \with (B \lolli C)$
+  \end{enumerate}
+\end{exercise}
+
+
+
+\section{Lecture 9 Exercises}
+
+\begin{exercise}
+ Both $\tensor R$ and $\with L$ are non-invertible rules.
+  Give another proof of the same proposition
+  ($\cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)$)
+  where they are used in the other order.
+\end{exercise}
+
+
+\begin{exercise}
+Translate your proof of
+  \[
+    \cdot \proves (p \with q) \lolli (r \with s) \lolli (p \tensor r)
+  \]
+from the previous exercise, choosing an appropriate polarization
+for the atomic propositions. Explain how the structure of the proof
+forces such a polarization.
+\end{exercise}
+
+
+
+\end{document}
