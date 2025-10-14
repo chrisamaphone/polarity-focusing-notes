@@ -1,0 +1,374 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\usepackage{bbold}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\newcommand{\parr}{\bindnasrepma}
+
+\title{Lecture 8: Linear Logic}
+\author{James Li}
+\date{October 6, 2025}
+
+\begin{document}
+
+\maketitle 
+
+\section{Introduction}
+
+Lecture outline: 
+\begin{itemize}
+  \item Inference rules and examples
+  \item Invertibility
+  \item Polarizing linear logic
+\end{itemize}
+
+We have so far only seen polarity and focusing in the context of intuitionistic logic. Historically, however, these concepts first arose in developing proof search for {\em linear logic}. In this lecture, we introduce a sequent calculus for linear logic and examine the polarity of its connectives. In the next lecture, we will focus it. 
+
+
+\section{Linear Sequent Calculus}
+
+Intuitionistic logic can be described as a ``logic of knowledge''. Its formulas are propositions that carry a notion of truth, and once proven, remain immutably true. This property is called the {\em persistence} or {\em monotonicity} of the logic. 
+
+In contrast, the formulas of linear logic behave like {\em resources}, which can be expended in deriving other resources. As a preview, consider the linear analog of implication: $A \lolli B$, which can be interpreted as a mechanism for exchanging the resource $A$ for resource $B$, after which $A$ is no longer usable. Here, the logic is no longer persistent nor monotonic; formulas are ephemeral and once derived, may be consumed. 
+
+Below, we present the formulas and inference rules of a sequent calculus for linear logic:
+
+\noindent {\bf Formulas:}
+\begin{align*}
+  A ::= & ~A~\with~B              & \text{\em ``$A$ with $B$''} \\
+        & \mid A \tensor B    & \text{\em ``$A$ tensor $B$''} \\
+        & \mid A \lolli B  & \text{\em ``$A$ lolli $B$''} \\ 
+        & \mid A \linPlus B     & \text{\em ``$A$ plus $B$''} \\
+        & \mid \top           & \text{unit of $\with$} \\
+        & \mid \one        & \text{unit of $\tensor$} \\
+        & \mid \zero         & \text{unit of $\linPlus$}
+\end{align*}
+
+\noindent {\bf With Rules}:
+\[
+  \infer[\with R]
+    {\Delta \proves A \with B}
+    {\Delta \proves A 
+     & \Delta \proves B
+    }
+  \qquad 
+  \infer[\with L_1]
+    {\Delta, A \with B \proves C}
+    {\Delta, A \proves C}
+  \qquad
+  \infer[\with L_2]
+    {\Delta, A \with B \proves C} 
+    {\Delta, B \proves C}
+\]
+
+\noindent {\bf Tensor rules}:
+\[
+  \infer[\tensor R]
+    {\Delta_1, \Delta_2 \proves A \tensor B}
+    {\Delta_1 \proves A 
+      & \Delta_2 \proves B 
+    }
+  \qquad
+  \infer[\tensor L]
+    {\Delta, A \tensor B \Rightarrow C}
+    {\Delta, A, B \proves C }
+\]
+
+\noindent {\bf Lolli rules}:
+\[
+  \infer[\lolli R]
+    {\Delta \proves A \lolli B}
+    {\Delta, A \proves B}
+  \qquad
+  \infer[\lolli L]
+    {\Delta_1, \Delta_2, A \lolli B \proves C}
+    {\Delta_1 \proves A 
+      & \Delta_2, B \proves C 
+    }
+\]
+
+\noindent {\bf Plus rules}:
+\[
+  \infer[\oplus R_1]
+    {\Delta \proves A \oplus B}
+    {\Delta \proves A}
+  \qquad
+  \infer[\oplus R_2]
+    {\Delta \proves A \oplus B}
+    {\Delta \proves B}
+  \qquad 
+  \infer[\oplus L]
+    {\Delta, A \oplus B \proves C}
+    {\Delta, A \proves C 
+     & \Delta, B \proves C 
+    }
+\]
+
+\noindent {\bf Top rule}:
+\[
+  \infer[\top R]
+    {\Delta \proves \top}{}
+  \qquad 
+  \text{(no left rule)}
+\]
+
+\noindent {\bf $\one$ rules}:
+\[
+  \infer[\one R]
+    {\Delta \proves \one}{\Delta = \cdot}
+  \qquad
+  \infer[\one L]
+    {\Delta, \one \proves C}
+    {\Delta \proves C}
+\]
+
+\noindent {\bf $\zero$ rule}:
+\[
+  \infer[\zero L]
+    {\Delta, \zero \proves C}{}
+  \qquad 
+  \text{(no right rule)}
+\]
+
+\noindent {\bf Identity rule}:
+\[
+  \infer[\text{id}]
+    {P \proves P}{}
+\]
+
+We now dive a little deeper into how linear logic departs from intuitionistic logic, focusing on the meaning of sequents and certain connectives, as well as corresponding inference rules.
+
+\subsection{Linearity}
+
+Since formulas (encoding the ephemeral notion of resource) may be consumed, the semantics of sequents $\Delta \proves A$ must change. We require that each assumption in the antecedent $\Delta$ be used {\bf exactly once} to yield $A$. This forces our identity rule to deviate from its intuitionistic counterpart, as the context must be restricted to a single occurrence of the atomic formula: 
+\[
+  \infer[\text{id}]
+    {P \proves P}{}
+\]
+Additionally, weakening and contraction are not admissible in our sequent calculus -- we cannot freely add or dedpulicate assumptions in context since these may leave us with leftover formulas that are never used or missing copies necessary for proving the result:
+\[
+  \infer[\textcolor{red}{invalid}]
+    {P, Q \proves P}{P \proves P}
+  \qquad 
+  \infer[\textcolor{red}{invalid}]
+    {A \proves A \tensor A}{A, A \proves A \tensor A}
+\]
+The only structural rule we retain is exchange. For this reason, linear logic is referred to as a {\em substructural} logic. 
+
+If we chose to weaken our interpretation of $\Delta \proves A$ to mean that $A$ can be proved using each assumption in $\Delta$ {\bf at most} once, then we would have a relaxation of linear logic known as {\em affine logic}. In affine logic, we recover weakening, and thus the identity rule above is interchangeable with the familiar rule from intuitionistic SC:
+\[
+  \infer[\text{id}*]
+    {\Delta, P \proves P}{}
+\] \\
+
+\noindent {\bf Intuitionistic vs. Linear Logic.} Common terminology used to describe both:
+\begin{center}
+\begin{tabular}{ll}
+  Intuitionistic & Linear \\
+  \hline
+  Persistent & - \\
+  Monotonic & Non-monotonic \\
+  Structural & Substructural \\
+  Unrestricted & Restricted 
+\end{tabular}
+\end{center}
+
+\subsection{Connectives}
+
+{\bf Conjunction.} 
+Linear logic splits conjunction into {\em multiplicative} ($\tensor$) and {\em additive} ($\with$) conjunction, whose right rules resemble that of intuitionistic $\iand$:
+\[
+  \infer[\tensor R]
+    {\Delta_1, \Delta_2 \proves A \tensor B}
+    {\Delta_1 \proves A 
+    \qquad
+    \Delta_2 \proves B}
+  \qquad 
+  \infer[\& R]
+    {\Delta \proves A \& B}
+    {\Delta \proves A 
+    \qquad 
+    \Delta \proves B}
+\]
+Notice that $\tensor R$ requires splitting the context into two subcontexts $\Delta_1$ and $\Delta_2$, each of which proves one of the conjuncts, whereas $\with R$ keeps the context whole in its premises. 
+$A \tensor B$ represents having both $A$ and $B$ together. $\Delta \proves A \tensor B$ means we can consume $\Delta$ to simultaneously yield both $A$ and $B$. This requires using a portion of $\Delta$ to produce $A$ and the remaining portion to produce $B$. \\ 
+
+$A \with B$ represents having $A$ and $B$ as alternatives. $\Delta \proves A \with B$ means we can choose to transform $\Delta$ into $A$ or, alternatively, $B$. We call this kind of choice {\em external choice}, which means that when consuming $A \with B$ on the left, we are free to commit to using either $A$ or $B$:
+\[
+  \infer[\with L_1]
+    {\Delta, A \with B \proves C}
+    {\Delta, A \proves C}
+  \qquad 
+  \infer[\with L_2]
+    {\Delta, A \with B \proves C}
+    {\Delta, B \proves C}
+\] 
+
+{\bf Disjunction.} On the other hand, $A \linPlus B$, also known as additive disjunction, represents {\em internal choice}. When using $A \linPlus B$ on the left, it is uncertain whether we have $A$ or $B$ -- this choice is made when producing $A \linPlus B$ and is ``opaque'' at the time of use. As a result, in the left rule for $\linPlus$, we need to case on each branch of the disjunction: 
+\[
+  \infer[\linPlus L]
+    {\Delta, A \linPlus B \proves C}
+    {\Delta, A \linPlus C 
+    \qquad 
+    \Delta, B \linPlus C}
+\]
+
+{\bf Units.} $\top$, $\one$, and $\zero$ are the units for $\with$, $\tensor$, and $\linPlus$ respectively. {\em E.g.} $A \with \top$ is interchangeable with $A$ for any $A$, and likewise for the other connectives with their units.
+
+You may have noticed that there is an asymmetry to the linear connectives: we have multiplicative and additive conjunction, yet only additive disjunction. {\em Classical linear logic} completes this picture with multiplicative disjunction $\parr$ and its unit $\bot$, as well as a negation operator. \\
+
+\noindent {\bf Conjunction vs. Disjunction}: 
+\begin{center}
+  \begin{tabular}{c | c c | c c}
+    & conjunction & & disjunction & \\
+    & add. & mult. & add. & \colorbox{yellow}{mult.} \\
+    \hline
+    connectives & $\with$ & $\tensor$ & $\linPlus$ & \colorbox{yellow}{$\parr$} \\
+    units & $\top$ & $\one$ & $\zero$ & \colorbox{yellow}{$\bot$} 
+\end{tabular}
+\end{center}
+
+\subsubsection{Proof Example}
+
+  In intuitionistic and classical logic, implications can be curried: 
+  \[
+    (A \iand B \imp C) \proves A \imp B \imp C
+  \]
+  In linear logic, we can derive a corresponding principle for $\otimes$ and $\lolli$:   
+  \[
+    \infer[\lolli R]
+      {A \tensor B \lolli C \proves A \lolli B \lolli C}
+      {\infer[\lolli R]
+        {A \tensor B \lolli C, A \proves B \lolli C}
+        {\infer[\lolli L]
+          {A \tensor B \lolli C, A, B \proves C}
+          {\infer[\tensor R]
+            {A, B \proves A \tensor B}
+            {\infer[\text{id}]
+              {A \proves A}{}
+            \qquad 
+            \infer[\text{id}]
+              {B \proves B}{}
+            }
+          \qquad 
+          \infer[\text{id}]
+            {C \proves C}{}
+          }
+        }
+      }
+  \]
+
+
+\begin{exercise}
+  Prove the other direction.: $A \lolli B \lolli C \proves A \tensor B \lolli C$. 
+\end{exercise}
+
+The same relationship fails to hold for $\with$ and $\lolli$. Intuitively, being able to prove $C$ using $A$ and then $B$ is not equivalent to doing so with solely one of $A$ or $B$. If we try to derive the analogous formula for $\with$ instead of $\otimes$, we find: 
+\[
+  \infer[\lolli R]
+    {A \with B \lolli C \proves A \lolli B \lolli C}
+    {\infer[\lolli R]
+      {A \with B \lolli C, A \proves B \lolli C}
+      {\infer[\lolli L]
+        {A \with B \lolli C, A, B \proves C}
+        {\infer[\with R]
+          {A, B \proves A \with B}
+          {\infer-[\textcolor{red}{invalid}]
+            {A, B \proves A}{} 
+          \qquad 
+          \infer-[\textcolor{red}{invalid}]
+            {A, B \proves B}{}
+          }
+        \qquad
+        \infer[\text{id}]
+          {C \proves C}{}
+        }
+      }
+    }
+\]
+That is, we cannot prove $A, B \proves A$ using the identity rule since $B$ is present in the antecedent. 
+
+\subsection{Vending Machine}
+
+To give a concrete interpretation to this logic, let's try to model a simple vending machine selling chips, kitkats, and soda and which accepts dollar bills and loose change. Take atomic formulas to be the basic resources that can be exchanged: 
+\[
+  P ::= {\sf dollar} 
+  \mid {\sf change}
+  \mid {\sf chips}
+  \mid {\sf kitkat}
+  \mid {\sf soda}
+\]
+Sometimes we have bad days. We may occasionally feed money into the machine without a snack in return. The operation of this machine can be described via: 
+\begin{align*}
+  {\sf dollar} \lolli~ 
+    & ((({\sf chips} \tensor {\sf change}) \linPlus \one) \\
+    & \&~ (({\sf kitkat} \tensor {\sf change}) \linPlus \one) \\
+    & \&~~({\sf soda} \linPlus \one))
+\end{align*}
+That is, providing a dollar, we can choose between:
+\begin{itemize}
+  \item a bag of chips and some change, with a chance of losing our money;
+  \item a kitkat and some change, with a chance of losing our money;
+  \item a soda, with a chance of losing our money.
+\end{itemize}
+Notice the distinction between $\with$ and $\linPlus$ in this example. We can freely choose between the different snack selections after inputting our dollar -- this is external choice represented using $\with$. Whether we get our snack or our money is sent to the void is a choice internal to the machine and inaccessible to us, the consumer. 
+
+\section{Invertibility and Polarity}
+
+Which of the inference rules are invertible? Starting with $\&$, we find that the right rule can be inverted via a linear cut-elimination (proof omitted, trust this is admissible):
+\[
+  \infer-[\text{cut}]
+    {\Delta \proves A}
+    {\Delta \proves A \with B
+    \qquad 
+    \infer[\with L]
+      {A \with B \proves A}
+      {\infer[\text{id}]
+        {A \proves A}{}
+      }
+    }
+\]
+$\with L_1$ and $\with L_2$ are not invertible, however. For instance, we can derive $A \with B \proves A$ from $A \proves A$ using $\with L_1$. But we cannot then invert $\with L_2$: 
+\[
+  \infer[\textcolor{red}{invalid}]
+    {B \proves A}
+    {A \with B \proves A}
+\]
+The opposite holds true of $\tensor$. We have that $\tensor L$ is invertible:
+\[
+  \infer-[\text{cut}]
+    {\Delta, A, B \proves C}
+    {\infer[\tensor R]
+      {A, B \proves A \tensor B}
+      {\infer[\text{id}]
+        {A \proves A}{}
+      \qquad 
+      \infer[\text{id}]
+        {B \proves B}{}
+      }
+    &\quad
+    \Delta, A \tensor B \proves C
+    }
+\]
+$\tensor R$ is not invertible, since choosing a splitting of the context is not syntax-directed. \\
+
+\noindent {\bf A summary of the invertibility of each rule}: 
+\begin{center}
+\begin{tabular}{c|ccccccc}
+  & $\with$ & $\tensor$ & $\lolli$ & $\top$ & $\one$ & $\linPlus$ & $\zero$ \\
+  \hline 
+  left-invertible?    & $\times$ & \checkmark & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
+  right-invertible?   & \checkmark & $\times$ & \checkmark & \checkmark & $\times$ & $\times$ & $\times$ \\
+  polarity & - & + & - & - & + & + & + 
+\end{tabular}
+\end{center}
+Unlike in intuitionistic logic, we see that each of our connectives has a clear, indisputable polarity. 
+
+\end{document}
