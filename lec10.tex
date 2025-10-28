@@ -1,0 +1,272 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage{bussproofs}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\EnableBpAbbreviations
+
+\newcommand{\letexp}[3]{\mathsf{let}~#1=#2~\mathsf{in}~#3}
+\newcommand{\printexp}{\mathsf{print}}
+\newcommand{\stringexp}[1]{\text{``#1"}}
+\newcommand{\exsusp}[1]{\mathsf{susp}~#1}
+\newcommand{\exabort}[1]{\mathsf{abort}~#1}
+\newcommand{\exreturn}[1]{\mathsf{return}~#1}
+\newcommand{\exforce}[1]{\mathsf{force}~#1}
+\newcommand{\exto}[2]{#1~\mathsf{to}~#2}
+\newcommand{\transl}[1]{\ulcorner #1 \urcorner}
+
+\title{Lecture 10: A Primer on Call-by-Push-Value}
+\author{Luis Garcia}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Outline}
+\begin{itemize}
+    \item Example program run through Call-by-Name and Call-by-Value
+    \item Call-by-Push-Value Type System and Operational Semantics
+    \item Encoding of CBV/CBN into CBPV
+\end{itemize}
+
+\section{Background}
+Paul Levy came up with Call-by-Push-Value (CBPV) to come up with a mathematical account of program semantics in the presence of effects. As will be illustrated in the next section, such accounts of semantics fall apart when effects are involved: there was not a clear ``story" for effects in program that would precisely characterize when and where they would occur in a program's run.
+
+Before CBPV, operational semantics were broadly from two camps: call-by-value (CBV) or call-by-name (CBN). In the former, you cannot substitute an argument to a lambda until that argument is a value. In the latter, you can substitute the argument even if it is not a value. CBPV provides a unified view of these semantics that is backed up by category theory.
+
+Now, why are we discussing CBPV in a class dedicated to focusing and polarity? One way to look at CBPV is as a ``bizarro" form of a focused logical system. They're not exactly the same system, but there are enough similarities that Paul Levy and Noam Zeilberger (a preeminent researcher on focusing) had to discuss their work in order to detangle them. We will see some loose correspondences arise between a CBPV system and a polarized system as we go along.
+
+\section{An Example Program in CBV and CBN}
+Let's begin our discussion on CBPV with an example program that has effects. We will see that running through the program with our standard notions of operational semantics (CBV and CBN) introduces a bit of ambiguity about the order of effects.
+\[
+    \letexp{y}{\printexp \stringexp{hello}; 3}{(
+    \letexp{f}{\exfun{x}.\printexp \stringexp{world}; x}{\langle f~y, f~(y + 1) \rangle}
+    )}
+\]
+We would expect the statement to behave differently under CBV and CBN semantics. In fact, it prints the statements in different orders, as seen in Table~\ref{tab:cbv-vs-cbn}.
+\begin{table}[]
+    \centering
+    \begin{tabular}{c|c}
+         \textbf{CBV} & \textbf{CBN}  \\
+         $>$ hello & $>$ world \\
+         $>$ world & $>$ hello \\
+         $>$ world & $>$ world \\
+         $>$ $\langle 3 , 4 \rangle$ & $>$ hello \\
+         & $\langle 3 , 4 \rangle$
+    \end{tabular}
+    \caption{The presence of effects makes the semantics ambiguous.}
+    \label{tab:cbv-vs-cbn}
+\end{table}
+Not only is the ordering of effects unintuitive, but the fact that they happen in different orders with different multiplicities shows that there is some ambiguity to the semantics in the presence of effects.
+
+\section{CBPV Type-System and Operational Semantics}
+In CBPV, we discriminate between expressions which are values and those which are computations. For the most part, the expressions are what you would expect in a small lambda calculus, but with some additions that allow us to shift between the two syntactic domains.
+\[
+    \begin{array}{rccl}
+         \mathit{Values} & v & ::= & x \mid \expair{v_1, v_2} \mid \expair{} \mid \exinl{v} \mid \exinr{v} \mid \exsusp{e}  \\
+         \mathit{Computations} & e & ::= & \exlam{x}.e \mid e~v \mid \exsplit{v,~x.y.e} \\ 
+         & & & \mid \excase{v,~x.e_1,~y.e_2} \mid \exabort{v} \mid \exreturn{v} \\
+         & & & \mid \exforce{v} \mid \exto{e}{x.e'} 
+    \end{array}
+\]
+Note that $\exsusp{}$ allows us to mix expressions into our values. The expressions $\exabort{}$, $\exreturn{}$, and $\exforce{}$ allow us to do the same with values. $\exabort{}$ is a special form that we use for error handling.
+
+Types can be presented uniformly, but we will choose to present them in a stratified, polarized manner. This will allow us to more immediately see a possible link between polarity and CBPV.
+\[
+    \begin{array}{rccl}
+         \mathit{Value~Types} & A^+, B^+ & ::= & A^+ \times B^+ \mid \tyone \mid \tyzero \mid A^+ + B^+ \mid UA^- \\
+         \mathit{Computation~Types} & A^-, B^- & ::= & A^+ \to B^- \mid FA^+
+    \end{array}
+\]
+The types $UA^-$ and $FA^+$ are \textit{shifts} that allow us to go between the two syntactic categories.
+
+We may now go over the typing rules. They will be stratified, as well. First, we have our typing rules for values. Note that the introduction rules for value types exactly correspond to positive types (we are treating products as positive).
+\begin{center}
+    \def\arraystretch{3}
+    \begin{tabular}{ccc}
+         \AXC{$v_1 : A^+$}
+         \AXC{$v_2 : B^+$}
+            \RightLabel{$\times$I}
+         \BIC{$\expair{v_1, v_2} : A^+ \times B^+$}
+         \DisplayProof
+         &
+         \AXC{$x : A \in \Gamma$}
+            \RightLabel{hyp}
+        \UIC{$\Gamma \vdash x:A$}
+         \DisplayProof
+         &
+         \AXC{}
+            \RightLabel{$\tyone$I}
+         \UIC{$\Gamma \vdash \langle \rangle : \tyone$}
+         \DisplayProof
+         \\
+         \AXC{$\Gamma \vdash v : A^+$}
+            \RightLabel{$+\text{I}_1$}
+         \UIC{$\exinl{v} : A^+ + B^+$}
+         \DisplayProof
+         &
+         \AXC{$\Gamma \vdash v : B^+$}
+            \RightLabel{$+\text{I}_2$}
+         \UIC{$\exinl{v} : A^+ + B^+$}
+         \DisplayProof
+    \end{tabular}
+\end{center}
+
+Computation types correspond to negative introduction rules (just for implication) and elimination forms.
+\begin{center}
+    \def\arraystretch{3}
+    \begin{tabular}{cc}
+         \AXC{$\Gamma, x : A^+ \vdash e : B^-$}
+            \RightLabel{$\times$I}
+         \UIC{$\Gamma \vdash \exlam{x}.e : A^+ \to B^-$}
+         \DisplayProof
+         &
+         \AXC{$\Gamma \vdash e : A^+ \to B^-$}
+         \AXC{$\Gamma \vdash v : A^+$}
+            \RightLabel{hyp}
+        \BIC{$\Gamma \vdash e~v : B^-$}
+         \DisplayProof
+         \\
+         \multicolumn{2}{c}{
+            \AXC{$\Gamma \vdash v : A^+ \times B^+$}
+            \AXC{$\Gamma, x : A^+, y : B^+ \vdash e : C$}
+                \RightLabel{$\times$E}
+            \BIC{$\exsplit{v,~x.y.e}: C$}
+            \DisplayProof
+         }
+         \\
+         \multicolumn{2}{c}{
+            \AXC{$\Gamma, v : \tyzero$}
+                \RightLabel{$\tyzero$E}
+            \UIC{$\exabort{v} : A$}
+            \DisplayProof
+         }
+    \end{tabular}    
+\end{center}
+
+Finally, we have our rules for shifts.
+\begin{center}
+    \def\arraystretch{3}
+    \begin{tabular}{cc}
+         \AXC{$\Gamma \vdash v : A^+$}
+            \RightLabel{F~I}
+         \UIC{$\Gamma \vdash \exreturn{v} : FA^+$}
+         \DisplayProof
+         &
+         \AXC{$\Gamma \vdash e : A^-$}
+            \RightLabel{U~I}
+         \UIC{$\exsusp{e} : UA^-$}
+         \DisplayProof
+         \\
+         \AXC{$\Gamma \vdash e : FA^+$}
+         \AXC{$\Gamma, x : A^+ \vdash e' : C$}
+            \RightLabel{F~E}
+         \BIC{$\Gamma \vdash \exto{e}{x.e'} : C$}
+         \DisplayProof
+         & 
+         \AXC{$\Gamma \vdash v : UA^-$}
+            \RightLabel{U~E}
+         \UIC{$\Gamma \vdash \exforce{v} : A^-$}
+         \DisplayProof
+    \end{tabular}
+\end{center}
+
+Now, to discuss semantics, we must include the notion of \textit{terminal computations}. These are just expressions that we single out as being ``value-like"---that is, there is nothing more to do with them.
+\[
+    \begin{array}{rccl}
+         \mathit{Terminal~Computations} & T & ::= & \exreturn{v} \mid \exlam{x}.e
+    \end{array}
+\]
+Our big-step semantics are thus:
+\begin{center}
+    \def\arraystretch{3}
+    \begin{tabular}{cc}
+         \AXC{$e \evals \exreturn{v}$}
+         \AXC{$[v/x]e' \evals T$}
+         \BIC{$\exto{e}{x.e'} \evals T$}
+         \DisplayProof
+         &
+         \AXC{$e \evals T$}
+         \UIC{$\exforce{\exsusp{e}} \evals T$}
+         \DisplayProof
+         \\
+         \multicolumn{2}{c}{
+            \AXC{$e \evals \exlam{x}.e'$}
+            \AXC{$[v/x]e' \evals T$}
+            \BIC{$e~v \evals T$}
+            \DisplayProof
+         }
+    \end{tabular}
+\end{center}
+See Levy~\cite{levy2022} for small-step and stack semantics for CBPV.
+
+\section{Encoding CBV/CBN into CBPV}
+Now, CBPV is a unified view of operational semantics through which we can capture both CBV and CBN. Let's rewrite our example program in strictly CBV semantics using our new syntax. (Author's note: please forgive me for not knowing how to indent).
+{
+\footnotesize
+\[
+    \exto{\printexp \stringexp{hello}}{\_.\exto{3}{\exto{\exreturn{(\exsusp{(\exto{\exlam{x}.\printexp\stringexp{world}}{\exreturn{x}})})}}}{f.\exto{(\exforce{f})~y}{r_1.\exto{(\exforce{f}) (y + 1)}{r_2.\exreturn{\expair{r_1, r_2}}}}}}
+\]
+}
+
+We can witness a generalization of this subsumption of both CBN and CBV into CBPV in Tables~\ref{tab:cbv-to-cbpv} and~\ref{tab:cbn-to-cbpv}. To read those tables, take the function $\transl{\_}$ to be overloaded as follows:
+\begin{itemize}
+    \item $\transl{\_} : \text{CBV Type $A^+$} \to \text{CBPV Value Type $A^+$}$
+    \item $\transl{\_} : \text{CBV Term Typed at  $A^+$} \to \text{CBPV Computation Typed At $FA^+$}$
+    \item $\transl{\_} : \text{CBN Type $A^-$} \to \text{CBPV Computation Type $A^-$}$
+    \item $\transl{\_} : \text{CBV Terms Typed at $A^-$} \to \text{CBPV Computation Typed at $A^-$}$
+\end{itemize}
+
+\begin{table}[]
+    \centering
+    \def\arraystretch{1.5}
+    \begin{tabular}{r|l}
+         CBV & CBPV \\
+         \hline 
+         $\transl{A^+ + B^+}$ & $\transl{A^+} + \transl{B^+}$ \\
+         $\transl{A^+ \to B^+}$ & $U(\transl{A^+} \to F\transl{B^+})$ \\
+         $\transl{x : A^+}$ & $\exreturn{x} : F\transl{A^+}$ \\
+         $\transl{\exinl{M} : A^+ + B^+}$ & $\exto{\transl{M}}{x.\exreturn{x}} : F(\transl{A^+} + \transl{B^+})$ \\
+         $\transl{\exinr{M} : A^+ + B^+}$ & $\exto{\transl{M}}{x.\exreturn{x}} : F(\transl{A^+} + \transl{B^+})$ \\
+         $\transl{\exlam{x}.M : A^+ \to B^+}$ & $\exreturn{(\exsusp{(\exlam{x}.\transl{M})})} : F(U(\transl{A^+} \to F\transl{B^+}))$ \\
+         $M~N : B^+$ & $\exto{\transl{M}}{f.\exto{\transl{N}}{x.(\exforce{f})~x}} : F\transl{B^+}$
+    \end{tabular}
+    \caption{CBV types and expressions embedded into CBPV.}
+    \label{tab:cbv-to-cbpv}
+\end{table}
+
+\begin{table}[]
+    \centering
+    \def\arraystretch{1.5}
+    \begin{tabular}{r|l}
+         CBV & CBPV \\
+         \hline 
+         $\transl{A^- + B^-}$ & $F(U\transl{A^-} + U\transl{B^-})$ \\
+         $\transl{A^+ \to B^-}$ & $U\transl{A^-} \to \transl{B^-}$ \\
+         $\transl{x : A^-}$ & $\exforce{x} : UA^-$ \\
+         $\transl{\exinl{M} : A^- + B^-}$ & $\exreturn{(\exinl{(\exsusp{\transl{M}})})} : F(U\transl{A^-} + U\transl{B^-})$ \\
+         $\transl{\exinr{M} : A^- + B^-}$ & $\exreturn{(\exinr{(\exsusp{\transl{M}})})} : F(U\transl{A^-} + U\transl{B^-})$ \\
+         $\transl{\exlam{x}.M : A^- \to B^-}$ & $\exlam{x}.\transl{M} : U\transl{A^-}\to\transl{B^-}$ \\
+         $M~N : B^-$ & $\transl{M}~(\exsusp{\transl{N}}) : \transl{B^-}$
+    \end{tabular}
+    \caption{CBN types and expressions embedded into CBPV.}
+    \label{tab:cbn-to-cbpv}
+\end{table}
+
+\begin{exercise}
+    Redo the example program in a CBN semantics using CBPV.
+\end{exercise}
+
+\bibliographystyle{acm}
+\bibliography{main}
+
+\end{document}
+
