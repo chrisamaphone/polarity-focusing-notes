@@ -1,0 +1,411 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+% macros
+\newcommand*{\bnfor}{\mid}
+\newcommand{\isfalse}{\ \mathsf{false}}
+\newcommand{\contra}{\#}
+\newcommand*{\1}{\mathbf{1}}
+\newcommand*{\0}{\mathbf{0}}
+\newcommand*{\exnot}{\mathsf{not}\, }
+\newcommand*{\exdot}[2]{#1.\, #2}
+\newcommand*{\exfst}{\mathsf{fst}\, }
+\newcommand*{\exsnd}{\mathsf{snd}\, }
+\renewcommand*{\exinl}[1]{\mathsf{inl}\,{#1}}
+\renewcommand*{\exinr}[1]{\mathsf{inr}\,{#1}}
+\newcommand*{\tsl}[1]{\ulcorner #1 \urcorner}
+
+\title{Lecture 12: Classical Logic as Computation}
+\author{Mingtong Lin}
+\date{November 03, 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Lecture outline:
+\begin{itemize}
+\item Judgmental classical logic: proof rules, proof terms, and operational semantics
+\item Classical reasoning: Double Negation Elimination, Law of the Excluded Middle, proof by contradiction
+\end{itemize}
+
+\section{Judgmental Classical Logic (JCL)}
+
+\subsection{Judgments and Syntax}
+
+In ~\cite{lovas_crary_2006}, the authors present a judgmental formulation of natural deduction for
+classical logic, JCL.  There are three forms of judgment in JCL:
+\begin{itemize}
+\item \(\Gamma \entails A \istrue\) from \(\Gamma\), we can prove \(A\) true
+\item \(\Gamma \entails A \isfalse\) from \(\Gamma\), we can prove \(A\) false
+\item \(\Gamma \entails \contra\) from \(\Gamma\), we can prove contradiction
+\end{itemize}
+
+In this note, we will present a simplified version of JCL.  The syntax is defined as the following:
+\begin{alignat*}{2}
+  &A, B ::= A \typrod B \bnfor A \tysum B \bnfor \1 \bnfor \0 \bnfor \neg A \qquad &&\text{propositions} \\
+  &\Gamma ::= \cdot \bnfor \Gamma, A \istrue \bnfor \Gamma, A \isfalse &&\text{contexts}
+\end{alignat*}
+
+Note that the above syntax does not include a rule for implications.  In classical logic, we
+normally have two choices of encoding implications:
+\begin{align*}
+  A \imp B &\triangleq \neg A \tysum B \\
+  &\triangleq \neg (A \typrod \neg B)
+\end{align*}
+We will use the first encoding, \(\neg A \tysum B\), through out this note.  For example, \(A \rightarrow A \typrod A\) is translated to \(\neg A \tysum (A \typrod A)\).
+
+\subsection{Logical Rules}
+
+The logical rules of JCL are presented as the following.  Note that many \(T\) rules are exactly the same introduction rules in NJ.
+
+\(\hfill\boxed{\Gamma \entails A \istrue}\)
+\[
+  \infer[\mathsf{hypT}]
+  {\Gamma, A \istrue \entails A \istrue}
+  {}
+  \qquad
+  \infer[\contra E_{T}]
+  {\Gamma \entails A \istrue}
+  {\Gamma, A \isfalse \entails \contra}
+\]
+\[
+  \infer[\1 T]
+  {\Gamma \entails \1 \istrue}
+  {}
+  \qquad
+  \infer[\typrod T]
+  {\Gamma \entails A \typrod B \istrue}
+  {\Gamma \entails A \istrue & \Gamma \entails B \istrue}
+\]
+\[
+  \infer[\tysum T_{1}]
+  {\Gamma \entails A \tysum B \istrue}
+  {\Gamma \entails A \istrue}
+  \qquad
+  \infer[\tysum T_{2}]
+  {\Gamma \entails A \tysum B \istrue}
+  {\Gamma \entails B \istrue}
+\]
+\[
+  \infer[\neg T]
+  {\Gamma \entails \neg A \istrue}
+  {\Gamma \entails A \isfalse}
+\]
+
+\(\hfill\boxed{\Gamma \entails A \isfalse}\)
+\[
+  \infer[\mathsf{hypF}]
+  {\Gamma, A \isfalse \entails A \isfalse}
+  {}
+  \qquad
+  \infer[\contra E_{F}]
+  {\Gamma \entails A \isfalse}
+  {\Gamma, A \istrue \entails \contra}
+\]
+\[
+  \infer[\typrod F_{1}]
+  {\Gamma \entails A \typrod B \isfalse}
+  {\Gamma \entails A \isfalse}
+  \qquad
+  \infer[\typrod F_{2}]
+  {\Gamma \entails A \typrod B \isfalse}
+  {\Gamma \entails B \isfalse}
+\]
+\[
+  \infer[\0 F]
+  {\Gamma \entails \0 \isfalse}
+  {}
+  \qquad
+  \infer[\tysum F]
+  {\Gamma \entails A \tysum B \isfalse}
+  {\Gamma \entails A \isfalse & \Gamma \entails B \isfalse}
+\]
+\[
+  \infer[\neg F]
+  {\Gamma \entails \neg A \isfalse}
+  {\Gamma \entails A \istrue}
+  \qquad
+  \text{(no \(\1 F\))}
+\]
+
+\(\hfill\boxed{\Gamma \entails \contra}\)
+\[
+  \infer[\contra I]
+  {\Gamma \entails \contra}
+  {\Gamma \entails A \istrue & \Gamma \entails A \isfalse}
+\]
+
+
+To better understand this logical system, let's go over a proof of \(\cdot \entails \neg A \tysum (A \typrod A) \istrue\).  To start with,
+we identify the form of judgment being \(\Gamma \entails A \istrue\), and therefore may want to
+adopt the intuition from NJ and look for the applicable ``introduction rules'' for the principal formula.  However,
+both the \(\tysum T_{1}\) and \(\tysum T_{2}\) rules require a premise proven from the context, while our context is empty
+and therefore cannot prove the premises for us.  Then, the only choice left is the \(\contra E_{T}\) rule, which proves
+\(A \istrue\) by contradiction, if we were able to have \(A \isfalse\) in the context in some way:
+\[
+  \infer[\contra E_{T}]
+  {\cdot \entails \neg A \tysum (A \typrod A) \istrue}
+  {\infer[?]
+    {\neg A \tysum (A \typrod A) \isfalse \entails \contra}
+    {\cdots}}
+\]
+Now, our context is no longer empty! We get \(\neg A \tysum (A \typrod A) \isfalse\) in it.  Then, to prove a contradiction,
+the \(\contra I\) rule requires proving two contradicting conclusions from our context:
+\[
+  \infer[\contra E_{T}]
+  {\cdot \entails \neg A \tysum (A \typrod A) \istrue}
+  {\infer[\contra I]
+    {\neg A \tysum (A \typrod A) \isfalse \entails \contra}
+    {\infer[?]
+      {\neg A \tysum (A \typrod A) \isfalse \entails \neg A \tysum (A \typrod A) \istrue}
+      {\cdots}
+      &
+      \infer[\mathsf{hypF}]
+      {\neg A \tysum (A \typrod A) \isfalse \entails \neg A \tysum (A \typrod A) \isfalse}
+      {}}}
+\]
+Let's ``zoom'' into the left subtree.  Now it seems plausible to use the good old ``introduction rules'', as our context
+is no longer empty.  Here, we decide to try injecting \(\neg A \istrue\) first.
+\[
+  \infer[\tysum T_{1}]
+  {\neg A \tysum (A \typrod A) \isfalse \entails \neg A \tysum (A \typrod A) \istrue}
+  {\infer[?]
+    {\neg A \tysum (A \typrod A) \isfalse \entails \neg A \istrue}
+    {\cdots}}
+\]
+Then, after another proof by contradiction, we observe that we are facing the same goal again, except that we now have
+more information in the context, \(A \istrue\).
+\[
+  \infer[\tysum T_{1}]
+  {u : \neg A \tysum (A \typrod A) \isfalse \entails \neg A \tysum (A \typrod A) \istrue}
+  {\infer[\neg T]
+    {u \entails \neg A \istrue}
+    {\infer[\contra F]
+      {u \entails A \isfalse}
+      {\infer[\contra I]
+        {u, A \istrue \entails \contra}
+        {\infer[?]
+          {u, A \istrue \entails \neg A \tysum (A \typrod A) \istrue}
+          {\cdots}
+          &
+          \infer[\mathsf{hypF}]
+          {u, A \istrue \entails \neg A \tysum (A \typrod A) \isfalse}
+          {}}}
+    }}
+\]
+This time, we try injecting \(A \typrod A \istrue\), since it is trivial to prove \(A \typrod A \istrue\) with \(A \istrue\) available.
+\[
+  \infer[\tysum T_{1}]
+  {u : \neg A \tysum (A \typrod A) \isfalse \entails \neg A \tysum (A \typrod A) \istrue}
+  {\infer[\neg T]
+    {u \entails \neg A \istrue}
+    {\infer[\contra F]
+      {u \entails A \isfalse}
+      {\infer[\contra I]
+        {u, A \istrue \entails \contra}
+        {\infer[\tysum T_{2}]
+          {u, A \istrue \entails \neg A \tysum (A \typrod A) \istrue}
+          {\infer[\typrod T]
+          {u, A \istrue \entails A \typrod A \istrue}
+          {\infer[\mathsf{hypT}]
+            {u, A \istrue \entails A \istrue}
+            {}
+            &
+            \infer[\mathsf{hypT}]
+            {u, A \istrue \entails A \istrue}
+            {}}}
+          &
+          \infer[\mathsf{hypF}]
+          {u, A \istrue \entails \neg A \tysum (A \typrod A) \isfalse}
+          {}}}
+    }}
+\]
+
+\section{Proof Terms Assignment}
+
+\subsection{Judgments and Syntax with Proof Terms}
+
+With proof terms, the truthy judgment becomes \(\Gamma \entails e : A \istrue\), and the falsy judgment becomes \(\Gamma \entails k : A \isfalse\).  The
+letter \(e\) and \(k\) are picked suggestively for ``expressions'' and ``continuations''.  Essentially, \(A \isfalse\) is translated
+to a continuation accepting \(A\), thus the metaphor that falsy formulae are consumers of the data, while the truthy formulae are
+producers of the data.
+\begin{alignat*}{2}
+  &e ::= x \bnfor \exunit \bnfor \expair{e_{1}, e_{2}} \bnfor \exinl e \bnfor \exinr e
+         \bnfor \exnot k \bnfor \exdot{u : \overline{A}}{c} \qquad && \text{expressions} \\
+  &k ::= u \bnfor k; \exfst \bnfor k; \exsnd \bnfor []
+         \bnfor [k_{1}, k_{2}] \bnfor \exnot e \bnfor \exdot{x : A}{c} \qquad &&\text{continuations} \\
+  &c ::= k \sret e &&\text{contradictions}
+\end{alignat*}
+Metavariables \(u\) and \(x\) are used respectively for falsy and truthy binders.  For proof term types, we use \(A\) for \(A \istrue\)
+and \(\overline{A}\) for \(A \isfalse\).
+
+\subsection{Logical Rules with Proof Terms}
+
+\(\hfill\boxed{\Gamma \entails e : A \istrue}\)
+\[
+  \infer[\mathsf{hypT}]
+  {\Gamma, x: A \entails x : A \istrue}
+  {}
+  \qquad
+  \infer[\contra E_{T}]
+  {\Gamma \entails \exdot{u : \overline{A}}{c} : A \istrue}
+  {\Gamma, u : \overline{A} \entails c : \contra}
+\]
+\[
+  \infer[\1 T]
+  {\Gamma \entails \exunit : \1 \istrue}
+  {}
+  \qquad
+  \infer[\typrod T]
+  {\Gamma \entails \expair{e_{1}, e_{2}} : A \typrod B \istrue}
+  {\Gamma \entails e_{1} : A \istrue & \Gamma \entails e_{2} : B \istrue}
+\]
+\[
+  \infer[\tysum T_{1}]
+  {\Gamma \entails \exinl e : A \tysum B \istrue}
+  {\Gamma \entails e : A \istrue}
+  \qquad
+  \infer[\tysum T_{2}]
+  {\Gamma \entails \exinr e : A \tysum B \istrue}
+  {\Gamma \entails e : B \istrue}
+\]
+\[
+  \infer[\neg T]
+  {\Gamma \entails \exnot k : \neg A \istrue}
+  {\Gamma \entails k : A \isfalse}
+\]
+
+\(\hfill\boxed{\Gamma \entails k : A \isfalse}\)
+\[
+  \infer[\mathsf{hypF}]
+  {\Gamma, u : \overline{A} \entails u : A \isfalse}
+  {}
+  \qquad
+  \infer[\contra E_{F}]
+  {\Gamma \entails \exdot{x : A}{c} : A \isfalse}
+  {\Gamma, x : A \entails M : \contra}
+\]
+\[
+  \infer[\typrod F_{1}]
+  {\Gamma \entails k; \exfst : A \typrod B \isfalse}
+  {\Gamma \entails k : A \isfalse}
+  \qquad
+  \infer[\typrod F_{2}]
+  {\Gamma \entails k; \exsnd : A \typrod B \isfalse}
+  {\Gamma \entails k : B \isfalse}
+\]
+\[
+  \infer[\0 F]
+  {\Gamma \entails [] : \0 \isfalse}
+  {}
+  \qquad
+  \infer[\tysum F]
+  {\Gamma \entails [k_{1}, k_{2}] : A \tysum B \isfalse}
+  {\Gamma \entails k_{1} : A \isfalse & \Gamma \entails k_{2} : B \isfalse}
+\]
+\[
+  \infer[\neg F]
+  {\Gamma \entails \exnot e : \neg A \isfalse}
+  {\Gamma \entails e : A \istrue}
+  \qquad
+  \text{(no \(\1 F\))}
+\]
+
+\(\hfill\boxed{\Gamma \entails c : \contra}\)
+\[
+  \infer[\contra I]
+  {\Gamma \entails k \sret e : \contra}
+  {\Gamma \entails e : A \istrue & \Gamma \entails k : A \isfalse}
+\]
+
+\subsection{Translating Traditional Elimination Forms}
+
+The usual elimination forms are absent in the expression language of JCL, but they can be simulated via proof by contradiction.
+\[
+  \infer[\typrod E_{1}]
+  {\Gamma \entails \exfst e : A \istrue}
+  {\Gamma \entails e : A \typrod B \istrue}
+  \qquad
+  \infer[\typrod E_{2}]
+  {\Gamma \entails \exsnd e : B \istrue}
+  {\Gamma \entails e : A \typrod B \istrue}
+\]
+\[
+  \infer[\tysum E]
+  {\Gamma \entails \excase{e, \exdot{x : A}{e_{1}}, \exdot{y : B}{e_{2}}} : C \istrue}
+  {\Gamma \entails e : A \tysum B \istrue
+    &
+    \Gamma, x : A \entails e_{1} : C \istrue
+    &
+  \Gamma, y : B \entails e_{2} : C \istrue}
+\]
+
+The translations are defined as:
+\begin{align*}
+\tsl{\exfst{e}} &\triangleq (\exfst; u) \sret \exdot{u : \overline{A}}{\tsl{e}} \\
+\tsl{\exsnd{e}} &\triangleq (\exsnd; u) \sret \exdot{u : \overline{A}}{\tsl{e}} \\
+\tsl{\excase{e, \exdot{x : A}{e_{1}}, \exdot{y : B}{e_{2}}}} &\triangleq [u \sret \exdot{x : A}{\tsl{e_{1}}}, u \sret \exdot{y : B}{\tsl{e_{2}}}] \sret \exdot{u : \overline{C}}{e}
+\end{align*}
+
+Then, the translation of lambda abstraction into JCL proof terms is:
+\[
+  \tsl{\lambda x : A. \; e} \triangleq \exdot{u : \overline{\neg A \tysum B}}{u \sret \exinl{(\exnot{(\exdot{x : A}{u \sret \exinr{\tsl{e}}})})}}
+\]
+
+With proof terms in hand, our previous example derivation can be written as:
+\[
+  \infer[\contra E_{T}]
+  {\cdot \entails \exdot{u : \overline{\neg A \tysum (A \typrod A)}}{u \sret \cdots} : \neg A \tysum (A \typrod A) \istrue}
+  {\infer[\contra I]
+    {u : \overline{\neg A \tysum (A \typrod A)} \entails u \sret \cdots : \contra}
+    {\infer[?]
+      {u : \overline{\neg A \tysum (A \typrod A)} \entails \cdots : \neg A \tysum (A \typrod A) \istrue}
+      {\cdots}
+      &
+      \infer[\mathsf{hypF}]
+      {u : \overline{\neg A \tysum (A \typrod A)} \entails u : \neg A \tysum (A \typrod A) \isfalse}
+      {}}}
+\]
+with the zoomed subtree:
+\[
+  \infer[\tysum T_{1}]
+  {u : \overline{\neg A \tysum (A \typrod A)} \entails \exinl{(\exnot{(u \sret \exdot{x}{\exinr{\expair{x, x}}})})} : \neg A \tysum (A \typrod A) \istrue}
+  {\infer[\neg T]
+    {u \entails \exnot{(u \sret \exdot{x}{\exinr{\expair{x, x}}})} : \neg A \istrue}
+    {\infer[\contra F]
+      {u \entails u \sret \exdot{x}{\exinr{\expair{x, x}}} : A \isfalse}
+      {\infer[\contra I]
+        {u, x : A \entails u \sret \exinr{\expair{x, x}} \contra}
+        {\infer[\tysum T_{2}]
+          {u, x : A \entails \exinr{\expair{x, x}} : \neg A \tysum (A \typrod A) \istrue}
+          {\infer[\typrod T]
+          {u, x : A \entails \expair{x, x} : A \typrod A \istrue}
+          {\infer[\mathsf{hypT}]
+            {u, x : A \entails x : A \istrue}
+            {}
+            &
+            \infer[\mathsf{hypT}]
+            {u, x : A \entails x : A \istrue}
+            {}}}
+          &
+          \infer[\mathsf{hypF}]
+          {u, x : A \entails u : \neg A \tysum (A \typrod A) \isfalse}
+          {}}}
+    }}
+\]
+
+\bibliographystyle{plainnat}
+\bibliography{main}
+
+\end{document}
