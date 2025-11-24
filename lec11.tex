@@ -1,0 +1,397 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{proof-dashed,amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{stmaryrd}
+\usepackage{microtype}
+\usepackage{bussproofs}
+\usepackage[utf8]{inputenc}
+\usepackage{float}
+\input{program-macros}
+\input{logic-macros}
+\input{metatheory}
+
+\EnableBpAbbreviations
+
+% Modified from Luis' lec10
+\newcommand{\letex}[2]{\textsf{let } #1 = #2 \textsf{ in}}
+\newcommand{\printex}{\textsf{print }}
+\newcommand{\stringex}[1]{\text{``#1''}}
+\newcommand{\suspex}{\textsf{susp }}
+\newcommand{\abortex}[1]{\mathsf{abort}~#1}
+\newcommand{\returnex}{\textsf{return }}
+\newcommand{\forceex}{\textsf{force }}
+\newcommand{\toex}{\textsf{ to }}
+\newcommand{\transl}[1]{\ulcorner #1 \urcorner}
+
+% Shubh's color macros
+\newcommand{\mred}[1]{{\color{red} #1}}
+\newcommand{\mblu}[1]{{\color{blue} #1}}
+
+% Hacky workaround to try to make pseudocode a little nicer
+\makeatletter
+\newenvironment{pseudocode}{\setlength{\jot}{0cm}\start@align\@ne\st@rredtrue\m@ne}{\endalign}
+\makeatother
+
+\title{Lecture 11: Effects and Coeffects in CBPV}
+\author{Joseph Rotella}
+\date{October 29, 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Outline}
+\begin{itemize}
+  \item Graded effects
+  \item Examples
+  \item Effect-preserving CBPV translation of CBV and CBN
+  \item Coeffects
+\end{itemize}
+
+We've discussed before the notion of an \emph{effect}: broadly speaking, it is something that a
+program does that changes the environment in some observable way. In this lecture, we will also
+consider the dual notion of a \emph{coeffect}: that is, a \emph{demand} that a program places on its
+environment, and how we can statically track such program characteristics in the setting of CBPV.
+
+These notes are based on a guest lecture given by Shubh Agrawal, and portions are directly drawn
+from their lecture notes. The lecture's content derives from the 2024 paper ``Effects and Coeffects
+in Call-by-Push-Value'' by Torczon et al. \cite{torczon2024effects}.
+
+\section{A Type System with Graded Effects}
+
+We begin by enriching our type system with a mechanism by which to statically track effects via
+our typing judgment. (Algebraic effects and monads are alternative tools for accomplishing this.)
+In particular, we present a system of \emph{graded effects}: intuitively, this will let us ``assign
+values to effects'' by which we may judgmentally track them. While we could, for instance, track
+\emph{that} a computation prints to the console (e.g., via a writer monad), we may additionally be
+interested in bounding \emph{how many} characters we print (this will be our running example
+throughout this presentation). Graded effects enable us to do this.
+
+We begin by modifying our inference rules with annotations that track how effects are sequenced
+through a program. To admit such annotations, we must modify the shape of our typing judgment for
+negative types (i.e., computations) so that it now associates to each computation a value $\varphi$
+indicating (in our example) how many characters are printed by that computation. We must also
+annotate our type $U$ of suspended computations with the number of characters that will be printed
+by that computation once forced. Our rules are as follows, with effect annotations highlighted in
+red (note that this language also includes the type $A \& B$ of lazy pairs, which we have discussed
+before but did not add to our prior formulation of CBPV; see section \ref{subsec-lazy-pairs}):
+
+% NB: these rules were translated from Typst, so the typesetting may be suboptimal
+\vspace{1em}
+$\boxed{\Gamma \vdash v : A^+}$
+\begin{equation*}
+\begin{gathered}
+  \infer[\mathsf{hyp}]{\Gamma_1, x : A, \Gamma_2 \vdash x : A}{}
+  \qquad
+  \infer[\times I]{\Gamma \vdash (v_1, v_2) : A \times B}{\Gamma \vdash v_1 : A & \Gamma \vdash v_2 : B}
+  \qquad
+  \infer[1 I]{\Gamma \vdash () : 1}{}
+  \\
+  \infer[+ I_1]{\Gamma \vdash \mathsf{inl}\, v : A + B}{\Gamma \vdash v : A}
+  \qquad
+  \infer[+ I_2]{\Gamma \vdash \mathsf{inr}\, v : A + B}{\Gamma \vdash v : B}
+  \qquad
+  \infer[UI]{\Gamma \vdash \mathsf{susp}\, e : U_{\mred{\varphi}} \, A^-}{\Gamma \vdash e :^{\mred{\varphi}} A^-}
+\end{gathered}
+\end{equation*}
+
+$\boxed{\Gamma \vdash e :^{\mred{\varphi}} A^-}$
+\begin{equation*}
+\begin{gathered}
+\infer[{\to} I]{\Gamma \vdash \lambda x . e :^{\mred{\varphi}} A \to B}{\Gamma, x : A \vdash e :^{\mred{\varphi}} B}
+\qquad
+\infer[{\to} E]{\Gamma \vdash e \, v :^{\mred{\varphi}} B}{\Gamma \vdash e :^{\mred{\varphi}} A \to B & \Gamma \vdash v : A}
+\\
+\infer[\times E]{\Gamma \vdash \mathsf{split}(v, x.y.e) :^{\mred{\varphi}} C}{\Gamma \vdash v : A \times B & \Gamma, x : A, y : B \vdash e :^{\mred{\varphi}} C}
+\\
+\infer[\& I]{\Gamma \vdash \langle e_1, e_2 \rangle :^{\mred{\varphi}} A^- \& B^-}{\Gamma \vdash e_1 :^{\mred{\varphi}} A^- & \Gamma \vdash e_2 :^{\mred{\varphi}} B^-}
+\qquad
+\infer[\& E_1]{\Gamma \vdash \mathsf{prjl}\, e :^{\mred{\varphi}} A^-}{\Gamma \vdash e :^{\mred{\varphi}} A^- \& B^-}
+\qquad
+\infer[\& E_2]{\Gamma \vdash \mathsf{prjr}\, e :^{\mred{\varphi}} B^-}{\Gamma \vdash e :^{\mred{\varphi}} A^- \& B^-}
+\\
+\infer[+E]{\Gamma \vdash \mathsf{case}(v, x.e_1, y.e_2) :^{\mred{\varphi}} C}{\Gamma \vdash v : A + B & \Gamma, x : A \vdash e_1 :^{\mred{\varphi}} C & \Gamma, y : B \vdash e_2 :^{\mred{\varphi}} C}
+\qquad
+\infer[0 E]{\Gamma \vdash \mathsf{abort}(v) :^{\mred{\varepsilon}} C}{\Gamma \vdash v : 0}
+\\
+\infer[UE]{\Gamma \vdash \mathsf{force}\, v :^{\mred{\varphi}} A^-}{\Gamma \vdash v : U_{\mred{\varphi}} \, A^-}
+\qquad
+\infer[FI]{\Gamma \vdash \mathsf{return}\, v :^{\mred{\varepsilon}} F \, A^+}{\Gamma \vdash v : A^+}
+\qquad
+\infer[FE]{\Gamma \vdash e \, \mathsf{to} \, x . e' :^{\mred{\varphi_1 \cdot \varphi_2}} C}{\Gamma \vdash e :^{\mred{\varphi_1}} F \, A^+ & \Gamma, x : A^+ \vdash e :^{\mred{\varphi_2}} C}
+\\
+\infer[\textsf{sub-eff}]{\Gamma \vdash e :^{\mred{\varphi}} A^-}{\Gamma \vdash e :^{\mred{\varphi'}} A^- & \mred{\varphi' \leq \varphi}}
+\qquad
+\infer[\mathsf{print}]{\Gamma \vdash \mathsf{print}\, s :^{\mred{|s|}} F \, 1}{}
+\end{gathered}
+\end{equation*}
+
+Note that we formulate our effect annotations as ranging over an arbitrary preordered monoid; for
+our running example here, we'll use the natural numbers, so $\varepsilon = 0$ and $(\cdot) = (+)$.
+
+Several of these rules merit closer inspection. The $\mathsf{print}$, $0E$, and $FI$ rules are the
+only ones that specify concrete values for the annotation $\varphi$: aborting and returning a value
+are both non-printing computations (and so are labeled with the nullary annotation $\varepsilon$),
+while $\printex s$ prints at most (and, indeed, exactly) $|s|$ characters. From these rules alone,
+it may seem odd that we merely insist that $\varphi$ be an upper bound (rather than an exact count)
+or that we include the rule $\textsf{sub-eff}$. An explanation of this decision is found in the $+E$
+rule: while the two branches of a $\mathsf{case}$ expression may have differing effects, we insist
+that the typing judgment be annotated by a single value $\varphi$, which must describe the effects
+of \emph{both} $e_1$ and $e_2$. (A similar situation occurs with the rules for lazy pairs.) This
+then demands the existence of the subeffecting rule $\textsf{sub-eff}$ to allow us to
+overapproximate the printing behavior of a computation.
+
+Effects are also ``combined'' in the $FE$ rule, though here we use the multiplication operation of
+our monoid (here, natural-number addition) to describe the cumulative effect of the computations $e$
+and $e'$. Finally, the $UI$ and $UE$ rules mediate the interchange of an effect annotation between
+the thunk type $U$ and the computation typing juudgment. The rest of the computation typing rules
+``thread'' existing effect annotations through introduction and elimination forms.
+
+\subsection{Interlude: Lazy Pairs}
+\label{subsec-lazy-pairs}
+
+Suppose we want to translate
+\begin{pseudocode}
+&\letex{p}{(\printex \stringex{hello};\, 5, \printex \stringex{world}; 6)}\\
+&\textsf{snd }p
+\end{pseudocode}
+
+We can translate this pair as eager or lazy.
+
+To translate this pair eagerly, we need to put \emph{values} in the positive pair, which means we
+are forced to evaluate the pieces first:
+\begin{pseudocode}
+&(\printex \stringex{abc} \toex \_.~ \returnex 5) \toex p_1.\\
+&(\printex \stringex{defgh} \toex \_.~ \returnex 6) \toex p_2.\\
+&\returnex (p_1, p_2) \toex p.\\
+&\textsf{split }(p, x.y.y)
+\end{pseudocode}
+
+For a lazy translation, we have no way of binding the pair itself, so we have to wrap it in a thunk.
+It will turn out that we can only bind \emph{after} projecting, which means only one side of it will
+be evaluated (which is precisely the semantics we would expect of a lazy pair when only one of its
+components is subsequently used):
+\begin{pseudocode}
+&\returnex \suspex \langle (\printex \stringex{abc} \toex \_.~ \returnex 5),\\
+  &\hspace{5.5em}(\printex \stringex{defgh} \toex \_.~ \returnex 6)\rangle \toex p.\\
+&\textsf{prjr } \forceex p
+\end{pseudocode}
+
+\section{Annotating an Example Program}
+
+To concretely demonstrate graded effects, we return to (a slight modification of) our previous
+example of a program with conflicting call-by-name and call-by-value semantics:
+\begin{pseudocode}
+&\letex{y}{\printex \stringex{hello};~ 3}\\
+&\letex{f}{\lambda x : \mathbb{Z}.~ \printex \stringex{worlds};~ x}\\
+&(f~y, f~(y+1))
+\end{pseudocode}
+Recall that, while this program always evaluates to $(3, 4)$, it prints differing output in the
+call-by-name and call-by-value settings:
+
+\begin{itemize}
+  \item \textbf{CBV}: helloworldsworlds
+  \item \textbf{CBN}: worldshelloworldshello
+\end{itemize}
+
+In particular, it prints differing numbers of characters to the console: 17 under CBV, and 22 under
+CBN. We can see this by applying our system of graded effects to our call-by-value and call-by-name
+translations of this program. Below is the CBV translation, annotated where effects occur:
+\begin{pseudocode}
+&(\printex \stringex{hello} \toex \_.~\returnex 3)^{\mred 5} \toex y.\\
+&\returnex \suspex (\lambda x : \mathbb{Z}.~ \printex \stringex{worlds} \toex \_.~\returnex x) \toex f.\\
+&(\forceex f)^{\mred 6}~y \toex r_1.\\
+&(\forceex f)^{\mred 6}~(y + 1) \toex r_2.\\
+&\returnex (r_1, r_2)
+\end{pseudocode}
+Observe that the \textsf{print} on the first line immediately prints 5 characters, while the thunk
+$f : U_6 (\mathbb{Z} \to F \mathbb{Z})$ suspends a 6-character-printing computation that is then
+forced twice.
+
+Now consider the CBN translation:
+\begin{pseudocode}
+&\returnex (\suspex (\printex \stringex{hello} \toex \_.~ \returnex 3)) \toex y.\\
+&\returnex (\suspex (\lambda x : U_6 (F \mathbb{Z}).~ \printex \stringex{worlds} \toex \_.~ \forceex x)) \toex f.\\
+&((\forceex f)~y)^\mred{11} \toex r_1.\\
+&((\forceex f)~(y + 1))^\mred{11} \toex r_2.\\
+&\returnex (r_1, r_2)
+\end{pseudocode}
+In this translation, $y$ is now also a thunk, namely of type $U_5 (F \mathbb{Z})$. Thus, its effect
+is not incurred until it is (twice) forced by the suspended body of $f$. The above program also
+illustrates an interesting characteristic of this calculus: we do not have ``effect-polymorphic''
+lambdas and so must decide \emph{a priori} the ``printing budget'' we will afford an argument to
+(the forcing of) $f$: this is encoded by the type $U_6(F \mathbb{Z})$ of its parameter.
+
+\section{CBV and CBN Translations}
+
+Translating from CBV (with graded effects) into our CBPV calculus is no more difficult than in the
+absence of graded effects: we can simply reuse our translation from last time. We will then have
+that whenever $\Gamma \vdash m :^\mred{\varphi} A$, it is the case that
+$\transl{\Gamma} \vdash \transl{m} :^\mred{\varphi} F\transl{A}$. Adding effect annotations to the
+lambda calculus is straightforward because it is eager, so we just write down whatever effects occur
+in a given term. In general, there will be terms in which multiple effects occur and are
+sequenced---in the term translation, those will all translate into our $F$-elimination.
+
+Translating from CBN is more complicated because effects in CBN are themselves more complicated. It
+is hard to annotate terms with effects because it is hard to locally determine whether the effects
+will actually occur (since this will depend on how---or if---the term is subsequently used). The
+typical approach here is to introduce a \emph{monad} $M$, which will allow us to internalize the
+effect annotations we previously introduced in our CBPV typing judgment:
+\begin{gather*}
+\infer[M I]
+  {\Gamma \vdash \returnex m : M_\mred{\varepsilon} A}
+  {\Gamma \vdash m : A}
+\\
+\infer[M E]
+  {\Gamma \vdash \textsf{bind } x \gets m_1.~ m_2 : M_\mred{\varphi_1 \cdot \varphi_2} B}
+  {\Gamma \vdash m_1 : M_\mred{\varphi_1} A & \Gamma, x : A \vdash m_2 : M_\mred{\varphi_2} B}
+\end{gather*}
+
+Notice that the elimination rule requires that the second expression \emph{also} be of monadic type
+(cf. $F E$, which does not). In this way, monadic type systems tend to lead to monads infecting all
+your code.
+
+As before, the CBN translation takes a type $A$ to a CBPV computation type $A^-$ and terms
+of type $A$ to computations of type $A^-$. In particular, it sends these terms to \emph{pure}
+computations. So, if $\Gamma \vdash m : A$, then
+$\transl{\Gamma} \vdash \transl{m} :^\mred{\varepsilon} \transl{A}$. The translation proceeds as
+follows:
+
+% NB: Converted from Typst; suboptimal TeX
+\begin{align*}
+\ulcorner M_{\mred{\varphi}} A \urcorner &= 
+    F (U_{\mred{\varphi}} (F (U_{\mred{\varepsilon}} \ulcorner A \urcorner))) \dots \\
+  \ulcorner \textsf{return  } m \urcorner &= \textsf{return  } (\textsf{susp  } (\textsf{return  } 
+                          (\textsf{susp  } \ulcorner m \urcorner))) \\
+  \ulcorner \textsf{bind } x \textsf{ from } m_1 \textsf{ . } m_2 \urcorner &= 
+    \textsf{return  } (\textsf{susp  } ( \\
+      &\hspace{3em} (\ulcorner m_1 \urcorner \textsf{ to } y.~ \textsf{force } y) \textsf{ to } x . \\
+      &\hspace{3em} \ulcorner m_2 \urcorner \textsf{ to } z . \\
+      &\hspace{3em}\textsf{force } z))
+\end{align*}
+
+$U \circ F$ is the monad---the other parts bracket it. This makes sense: we think of a monad as a
+suspended computation that returns the inside type. But the inside type needs to be turned into a
+value. Then the whole thing needs to be a computation, so we are ultimately returning that.
+
+\section{Generalizing Effect Structure}
+
+We previously remarked that our effect annotations can range over any preordered monoid. Why does
+this exhibit the structural properties we need to capture the desired properties of effects? We
+need to be able to capture:
+\begin{itemize}
+  \item The empty effect, for returning
+  \item A sequencing operation
+  \item An ordering operation for approximation/subeffecting
+\end{itemize}
+These desiderata translate directly into the laws for a preordered monoid:
+\begin{itemize}
+  \item Identity: $\forall \varphi,~ \varepsilon \cdot \varphi = \varphi = \varphi \cdot \varepsilon$
+  \item Associativity: $\forall \varphi_1\, \varphi_2\, \varphi_3,~ \varphi_1 \cdot (\varphi_2 \cdot \varphi_3) = (\varphi_1 \cdot \varphi_2) \cdot \varphi_3$
+  \item Respect for ordering: $\forall \varphi_1\, \varphi_1'\, \varphi_2,~ \varphi_1 \leq \varphi_1' \implies \varphi_1 \cdot \varphi_2 \leq \varphi_1' \cdot \varphi_2$
+\end{itemize}
+We can also specialize this construction in various ways. For instance, replacing the preorder with
+equality yields a \emph{precise} ordering: you know exactly what effect will happen. The trade-off,
+as we have seen, is that many branching programs will no longer type-check. Another interesting
+example is taking our monoid to be a powerset with set union, using set inclusion as the preorder.
+This lets us reason about a \emph{set} of possible effects (throwing, diverging, writing, \ldots{})
+that can be unioned together.
+
+\section{Coeffects}
+
+Coeffects are about \emph{resource usage}. The idea is that our program somehow makes demands on its
+environment. (Note that, in colloquial usage, we may sometimes refer to such behaviors as
+``effects!'') For instance, we may be interested in tracking the number of times we use a variable:
+this will be our running example for this section.
+
+Our rules are as follows:
+
+% NB: translated from Typst
+\vspace{1em}
+$\boxed{\mblu{\gamma} \Gamma \vdash v : A^+}$
+\[
+\begin{array}{c}
+\infer[\textsf{hyp}]{\mblu{\overline{0}} \Gamma_1, x :^{\mblu{1}} A^+, \mblu{\overline{0}} \Gamma_2 \vdash x : A^+}{}
+\qquad
+\infer[\times I]{\mblu{(\gamma_1 + \gamma_2)} \Gamma \vdash (v_1, v_2) : A \times B}{\mblu{\gamma_1} \Gamma \vdash v_1 : A & \mblu{\gamma_2} \Gamma \vdash v_2 : B}
+\qquad
+\infer[1I]{\mblu{\overline{0}} \Gamma \vdash () : 1}{}
+\\[3ex]
+\infer[+I_1]{\mblu{\gamma}\Gamma \vdash \textsf{inl}\, v : A^+ + B^+}{\mblu{\gamma}\Gamma \vdash v : A^+}
+\qquad
+\infer[+I_2]{\mblu{\gamma}\Gamma \vdash \textsf{inr}\, v : A^+ + B^+}{\mblu{\gamma}\Gamma \vdash v : B^+}
+\qquad
+\infer[UI]{\mblu{\gamma}\Gamma \vdash \textsf{susp}\, e : U\, A^-}{\mblu{\gamma}\Gamma \vdash e : A^-}
+\\[3ex]
+\infer[\textsf{sub}]{\mblu{\gamma'} \Gamma \vdash v : A^+}{\mblu{\gamma} \Gamma \vdash v : A^+ & \mblu{\gamma' \leq_{\text{co}} \gamma}}
+\end{array}
+\]
+
+$\boxed{\mblu{\gamma} \Gamma \vdash e : A^-}$
+\[
+\begin{array}{c}
+\infer[{\to} I]{\mblu{\gamma} \Gamma \vdash \lambda^{\mblu{q}} x . e : A^{\mblu{q'}} \to B}{\mblu{\gamma} \Gamma, x :^{\mblu{q}} A \vdash e : B & \mblu{q' \leq_\text{co} q}}
+\qquad
+\infer[{\to} E]{\mblu{(\gamma_1 + q \cdot \gamma_2)} \Gamma \vdash e\, v : B}{\mblu{\gamma_1} \Gamma \vdash e : A^{\mblu{q}} \to B & \mblu{\gamma_2} \Gamma \vdash v : A}
+\\[3ex]
+\infer[\times E]{\mblu{(q \cdot \gamma_1 + \gamma_2)} \Gamma \vdash \textsf{split}_{\mblu{q}} (v, x.y.e) : C}{\mblu{\gamma_1} \Gamma \vdash v : A \times B & \mblu{\gamma_2} \Gamma, x :^{\mblu{q}} A, y :^{\mblu{q}} B \vdash e : C}
+\\[3ex]
+\infer[\&I]{\mblu{\gamma} \Gamma \vdash \langle e_1, e_2 \rangle : A^- \& B^-}{\mblu{\gamma} \Gamma \vdash e_1 : A^- & \mblu{\gamma} \Gamma \vdash e_2 : B^-}
+\qquad
+\infer[\&E_1]{\mblu{\gamma} \Gamma \vdash \textsf{prjl}\, e : A^-}{\mblu{\gamma} \Gamma \vdash e : A^- \& B^-}
+\qquad
+\infer[\&E_2]{\mblu{\gamma} \Gamma \vdash \textsf{prjr}\, e : B^-}{\mblu{\gamma} \Gamma \vdash e : A^- \& B^-}
+\\[3ex]
+\infer[+E]{\mblu{(q \cdot \gamma + \gamma')} \Gamma \vdash \textsf{case}_{\mblu{q}}(v, x.e_1, y.e_2) : C}{\mblu{\gamma} \Gamma \vdash v : A + B & \mblu{\gamma'} \Gamma, x :^{\mblu{q}} A \vdash e_1 : C & \mblu{\gamma'} \Gamma, y :^{\mblu{q}} B \vdash e_2 : C & \mblu{q \leq_\text{co} 1}}
+\\[3ex]
+\infer[0E]{\mblu{\gamma} \Gamma \vdash \textsf{abort}(v) : C}{\mblu{\gamma} \Gamma \vdash v : 0}
+\qquad
+\infer[UE]{\mblu{\gamma} \Gamma \vdash \textsf{force}\, v : A^-}{\mblu{\gamma} \Gamma \vdash v : U\, A^-}
+\\[3ex]
+\infer[FI]{\mblu{q \cdot \gamma} \Gamma \vdash \textsf{return}_{\mblu{q}} v : F_{\mblu{q}}\, A^+}{\mblu{\gamma} \Gamma \vdash v : A^+}
+\qquad
+\infer[FE]{\mblu{(q_2 \cdot \gamma + \gamma')} \Gamma \vdash e \mathbin{\textsf{to}_{\mblu{q_2}}} x . e' : C}{\mblu{\gamma} \Gamma \vdash e : F_{\mblu{q_1}}\, A^+ & \mblu{\gamma'} \Gamma, x :^{\mblu{q_1 \cdot q_2}} A^+ \vdash e' : C}
+\end{array}
+\]
+
+Note that we need a bit more structure on coeffect annotations than for effect annotations: to
+fully capture resource management---splitting, moving around, and multiplying resources---we require
+the richer structure of a \emph{semiring}.
+
+We illustrate this system's usage with an example program, written as call-by-value and call-by-name
+variants:
+
+\[
+    \centering
+    \begin{tabular}{p{4cm}|p{4cm}}
+         \textbf{CBV} & \textbf{CBN}  \\
+         {\vspace{-0.6cm}\begin{pseudocode}
+          &\textsf{return}_\mblu{2}~z + z \toex y.\\
+          &\textsf{return}_\mblu{2}~\suspex (\lambda x.\\
+            &\quad\returnex x + x + x) \toex f.\\
+          &(\forceex f)~y \toex r_1.\\
+          &(\forceex f)~(y + 1) \toex r_2.\\
+          &\returnex (r_1, r_2)
+         \end{pseudocode}\vspace{-0.6cm}}
+         &
+         {\vspace{-0.6cm}\begin{pseudocode}
+          &\textsf{return}_\mblu{2}~ \suspex (z + z) \toex y.\\
+          &\textsf{return}_\mblu{2}~\suspex (\lambda x.~ \forceex x \textsf{ to}_\mblu{3}~ x'.\\
+            &\quad\returnex x' + x' + x') \toex f.\\
+          &(\forceex f)~y \toex r_1.\\
+          &(\forceex f)~(y + 1) \toex r_2.\\
+          &\returnex (r_1, r_2)
+         \end{pseudocode}\vspace{-0.6cm}}
+    \end{tabular}
+\]
+
+The presentation we have given in this section is an example of \emph{structured coeffects}, in
+which coeffects are associated with variables. It is also possible to formulate \emph{flat
+coeffects}, which give a single annotation to an entire context.
+
+\bibliographystyle{acm}
+\bibliography{main}
+
+\end{document}
+
